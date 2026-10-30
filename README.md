@@ -26,13 +26,14 @@ Claude Code ──stdin JSON──▶ bridge/statusline.py ──▶ ~/.cache/cl
 
 ### Auto-check (desktop app and editor panels)
 
-Only terminal sessions run the status line, so `bridge/probe.py` fills the gap. On every refresh the plugin starts `probe.py --auto` in the background, and it checks only when **all** of these hold:
+Only terminal sessions run the status line, so `bridge/probe.py` fills the gap. On every refresh the plugin starts `probe.py --auto` in the background. A check runs when auto-check isn't paused (menu: **Pause / Resume auto-check**), the last reading is at least 5 minutes old, and either:
 
-- auto-check isn't paused (menu: **Pause / Resume auto-check**)
-- a Claude Code transcript under `~/.claude/projects` changed since the last reading (some session, in any app, was active)
-- the last reading is at least 5 minutes old
+- your 5-hour window is still open, which also catches usage from claude.ai and other devices, or
+- a Claude Code transcript under `~/.claude/projects` changed since the last reading (some session, in any app, was active).
 
-A check runs `claude -p --model haiku` with no tools, no MCP servers, no user settings or hooks, a one-line system prompt, and `--no-session-persistence`, then reads the `rate_limit_event` from its stream-json output. Measured cost: about 900 tokens per check. That's at most about 12 checks an hour, and none while you're idle or working only in a terminal. **Check now** runs one immediately, even while paused.
+When you're idle and the 5-hour window has closed, checks stop: any request would itself open a new 5-hour window and shift your reset times. The menu then shows "idle, waiting for activity", and checks resume as soon as you use Claude Code again.
+
+A check runs `claude -p --model haiku` with no tools, no MCP servers, no user settings or hooks, a one-line system prompt, and `--no-session-persistence`, then reads the `rate_limit_event` from its stream-json output. Measured cost: about 900 tokens per check, at most 12 an hour. **Check now** runs one immediately, even while paused.
 
 ### Limits of this approach
 

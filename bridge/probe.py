@@ -9,9 +9,9 @@ app or an editor panel, nothing refreshes the cache, so this runs
 and reads the `rate_limit_event` from its stream-json output. It costs roughly
 a thousand Haiku tokens and saves no session.
 
-  probe.py --auto    check only if a Claude Code session was active since the
-                     last reading and that reading is older than the interval
-                     (the SwiftBar plugin calls this every refresh)
+  probe.py --auto    check if the last reading is older than the interval and
+                     either a 5-hour window is open or a Claude Code session
+                     was active since (the SwiftBar plugin calls this every refresh)
   probe.py --now     check right away (ignores pause)
   probe.py --pause   stop automatic checks
   probe.py --resume  allow automatic checks again
@@ -138,16 +138,26 @@ def load_state() -> dict:
         return {}
 
 
+IDLE_REASON = "idle, no open 5-hour window"
+
+
 def should_auto_check(now: float) -> tuple[bool, str]:
+    """Check every interval while a 5-hour window is open or you're active.
+
+    When idle with no open window, a request would itself start a new 5-hour
+    window and shift your reset times, so wait for real activity instead."""
     if PAUSE_FLAG.exists():
         return False, "paused"
     cache = load_cache(CACHE_PATH)
     last_reading = max(cache.get("checked_at", 0), load_state().get("last_run", 0))
     if now - last_reading < INTERVAL_S:
         return False, "recent reading"
-    if last_activity() <= last_reading:
-        return False, "no Claude Code activity since last reading"
-    return True, "activity since last reading"
+    if last_activity() > last_reading:
+        return True, "activity since last reading"
+    five_hour = (cache.get("windows") or {}).get("five_hour") or {}
+    if five_hour.get("resets_at", 0) > now:
+        return True, "5-hour window open"
+    return False, IDLE_REASON
 
 
 def check(now: float) -> int:
@@ -197,6 +207,10 @@ def main() -> int:
         go, why = should_auto_check(now)
         if not go:
             print("skipped:", why)
+            state = load_state()
+            if state.get("skipped") != why and why != "recent reading":
+                state["skipped"] = why  # shown in the menu
+                write_cache(PROBE_STATE, state)
             return 0
     return check(now)
 

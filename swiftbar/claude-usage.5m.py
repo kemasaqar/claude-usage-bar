@@ -111,6 +111,8 @@ def print_auto_check_menu(now: float) -> None:
         state = {}
     paused = PAUSE_FLAG.exists()
     status = "paused" if paused else "on"
+    if not paused and state.get("skipped", "").startswith("idle"):
+        status += " · idle, waiting for activity"
     if state.get("last_run"):
         mark = "✓" if state.get("ok") else "✗"
         status += f" · last check {fmt_duration(now - state['last_run'])} ago {mark}"
@@ -193,8 +195,8 @@ def main() -> None:
     ago = fmt_duration(now - checked_at)
     print(f"Last reading {ago} ago" + (" (stale)" if stale else "") + " | size=11")
     if stale:
-        print("--No Claude Code activity or check in the last "
-              f"{STALE_AFTER_S // 60}m; numbers may be behind. | size=11")
+        print(f"--No reading in the last {STALE_AFTER_S // 60}m. Checks pause while you're | size=11")
+        print("--idle with no open 5-hour window, so a check doesn't start one. | size=11")
     print("---")
     print_auto_check_menu(now)
     print("Refresh | refresh=true")

@@ -103,12 +103,25 @@ class ProbeTest(unittest.TestCase):
         w = json.loads(self.cache.read_text())["windows"]
         self.assertEqual(w["five_hour"]["used_percentage"], 10.0)
 
-    def test_auto_skips_without_activity(self):
-        self.write_cache(self.now - 3600)
-        self.touch_transcript(self.now - 7200)  # older than last reading
+    def test_auto_checks_while_window_open_even_when_idle(self):
+        self.write_cache(self.now - 3600)       # 5-hour window resets in 1h
+        self.touch_transcript(self.now - 7200)  # no activity since last reading
         r = self.probe("--auto")
-        self.assertIn("no Claude Code activity", r.stdout)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertEqual(len(self.calls()), 1)
+
+    def test_auto_skips_when_idle_and_window_closed(self):
+        self.state_dir.mkdir(parents=True)
+        self.cache.write_text(json.dumps({
+            "updated_at": self.now - 7200, "checked_at": self.now - 7200,
+            "windows": {"five_hour": {"used_percentage": 40.0, "resets_at": self.now - 60}},
+        }))
+        self.touch_transcript(self.now - 9000)
+        r = self.probe("--auto")
+        self.assertIn("idle, no open 5-hour window", r.stdout)
         self.assertEqual(self.calls(), [])
+        state = json.loads((self.state_dir / "probe.json").read_text())
+        self.assertEqual(state["skipped"], "idle, no open 5-hour window")
 
     def test_auto_skips_recent_reading(self):
         self.write_cache(self.now - 60)
