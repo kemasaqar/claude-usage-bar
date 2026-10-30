@@ -57,7 +57,7 @@ The plugin is symlinked, so edits in this folder take effect on the next refresh
 | Variable | Default | Used by |
 |---|---|---|
 | `CLAUDE_USAGE_BAR_CACHE` | `~/.cache/claude-usage-bar/usage.json` | both |
-| `CLAUDE_USAGE_BAR_STALE_MIN` | `60` | plugin: minutes without change before ⚠ |
+| `CLAUDE_USAGE_BAR_STALE_MIN` | `60` | plugin: minutes without a reading before ⚠ |
 | `CLAUDE_USAGE_BAR_PROBE_MIN` | `5` | probe: minimum minutes between readings |
 | `CLAUDE_USAGE_BAR_CLAUDE` | found automatically | probe: path to the `claude` binary |
 | `CLAUDE_USAGE_BAR_PROJECTS` | `~/.claude/projects` | probe: where to look for session activity |

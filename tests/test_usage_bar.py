@@ -143,6 +143,17 @@ class UsageBarTest(unittest.TestCase):
         self.assertIn("⚠", out.splitlines()[0])
         self.assertIn("(stale)", out)
 
+    def test_plugin_unchanged_but_recently_checked_is_not_stale(self):
+        self.cache.parent.mkdir(parents=True)
+        self.cache.write_text(json.dumps({
+            "updated_at": self.now - 3 * 3600,  # numbers haven't moved
+            "checked_at": self.now - 300,       # but a reading just confirmed them
+            "windows": {"five_hour": {"used_percentage": 10, "resets_at": self.now + 3600}},
+        }))
+        out = self.plugin()
+        self.assertNotIn("⚠", out.splitlines()[0])
+        self.assertIn("Last reading 5m ago", out)
+
 
 if __name__ == "__main__":
     unittest.main()

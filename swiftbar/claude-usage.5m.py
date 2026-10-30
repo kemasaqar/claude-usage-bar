@@ -142,7 +142,9 @@ def main() -> None:
         return
 
     updated_at = cache.get("updated_at", 0)
-    stale = now - updated_at > STALE_AFTER_S
+    # Stale means no reading arrived lately, not that the numbers didn't move.
+    checked_at = max(cache.get("checked_at", 0), updated_at)
+    stale = now - checked_at > STALE_AFTER_S
 
     rows = []
     for name in ("five_hour", "seven_day", "spend_limit"):
@@ -185,8 +187,11 @@ def main() -> None:
             print(f"${w['used_usd']:.2f} of ${w['limit_usd']:.2f} {w.get('period', '')} | size=11")
 
     print("---")
-    ago = fmt_duration(now - updated_at)
-    print(f"Last change {ago} ago" + (" (stale)" if stale else "") + " | size=11")
+    ago = fmt_duration(now - checked_at)
+    print(f"Last reading {ago} ago" + (" (stale)" if stale else "") + " | size=11")
+    if stale:
+        print("--No Claude Code activity or check in the last "
+              f"{STALE_AFTER_S // 60}m; numbers may be behind. | size=11")
     print("---")
     print_auto_check_menu(now)
     print("Refresh | refresh=true")
