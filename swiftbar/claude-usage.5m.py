@@ -35,6 +35,9 @@ STALE_AFTER_S = int(os.environ.get("CLAUDE_USAGE_BAR_STALE_MIN", "60")) * 60
 
 LABELS = {"five_hour": "5-hour", "seven_day": "7-day", "spend_limit": "Spend"}
 FONT = "font=Menlo size=12"
+# Lines without an action render as disabled (grey) menu items; an explicit
+# color keeps them readable. SwiftBar takes "light,dark".
+TEXT_COLOR = "#1D1D1F,#F5F5F7"
 
 
 def color_for(pct: float) -> str:
@@ -175,16 +178,16 @@ def main() -> None:
     print("---")
     for name, w, pct, has_reset in rows:
         label = LABELS[name]
-        c = color_for(pct)
-        c_attr = f" color={c}" if c else ""
-        print(f"{label:<7}{bar(pct)} {pct:5.1f}% | {FONT}{c_attr}")
+        c = color_for(pct) or TEXT_COLOR
+        print(f"{label:<7}{bar(pct)} {pct:5.1f}% | {FONT} color={c}")
+        info = f"size=11 color={TEXT_COLOR}"
         if has_reset:
-            print("Window has reset (0% until next Claude Code reply) | size=11")
+            print(f"Window has reset (0% until the next reading) | {info}")
         else:
             left = fmt_duration(w["resets_at"] - now)
-            print(f"Resets in {left} ({fmt_clock(w['resets_at'], now)}) | size=11")
+            print(f"Resets in {left} ({fmt_clock(w['resets_at'], now)}) | {info}")
         if name == "spend_limit" and "used_usd" in w and "limit_usd" in w:
-            print(f"${w['used_usd']:.2f} of ${w['limit_usd']:.2f} {w.get('period', '')} | size=11")
+            print(f"${w['used_usd']:.2f} of ${w['limit_usd']:.2f} {w.get('period', '')} | {info}")
 
     print("---")
     ago = fmt_duration(now - checked_at)
