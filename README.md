@@ -24,9 +24,20 @@ Claude Code ──stdin JSON──▶ bridge/statusline.py ──▶ ~/.cache/cl
 - The bridge merges each window into the cache with one rule: usage within a window only goes up. A value is accepted only if it's from a newer window (later `resets_at`) or the same window with a higher percentage. Several open sessions can't clobber each other with older data.
 - Once a window's reset time passes, the menu bar shows `0%↺` instead of the old number.
 
+### Auto-check (desktop app and editor panels)
+
+Only terminal sessions run the status line, so `bridge/probe.py` fills the gap. On every refresh the plugin starts `probe.py --auto` in the background, and it checks only when **all** of these hold:
+
+- auto-check isn't paused (menu: **Pause / Resume auto-check**)
+- a Claude Code transcript under `~/.claude/projects` changed since the last reading (some session, in any app, was active)
+- the last reading is at least 5 minutes old
+
+A check runs `claude -p --model haiku` with no tools, no MCP servers, no user settings or hooks, a one-line system prompt, and `--no-session-persistence`, then reads the `rate_limit_event` from its stream-json output. Measured cost: about 900 tokens per check. That's at most about 12 checks an hour, and none while you're idle or working only in a terminal. **Check now** runs one immediately, even while paused.
+
 ### Limits of this approach
 
-- Numbers update only when a Claude Code session gets a reply. Usage from claude.ai or the desktop app shares the same limits but shows up only after your next Claude Code reply.
+- Only the **terminal CLI** runs the status line. Tested 2026-10-30: the Claude desktop app's Code tab and the VS Code/Cursor extension's graphical panel never call it. Auto-check covers those, with up to 5 minutes' delay.
+- With auto-check paused, numbers update only when a terminal session gets a reply. Usage from claude.ai or the desktop app shares the same limits but shows up only after your next Claude Code reply.
 - `rate_limits` is present only on Pro/Max plans (or a gateway with a spend limit).
 - Using your own OAuth login against the usage endpoint was ruled out: Anthropic's [legal and compliance page](https://code.claude.com/docs/en/legal-and-compliance) restricts subscription OAuth to Anthropic's own apps.
 
@@ -47,6 +58,9 @@ The plugin is symlinked, so edits in this folder take effect on the next refresh
 |---|---|---|
 | `CLAUDE_USAGE_BAR_CACHE` | `~/.cache/claude-usage-bar/usage.json` | both |
 | `CLAUDE_USAGE_BAR_STALE_MIN` | `60` | plugin: minutes without change before ⚠ |
+| `CLAUDE_USAGE_BAR_PROBE_MIN` | `5` | probe: minimum minutes between readings |
+| `CLAUDE_USAGE_BAR_CLAUDE` | found automatically | probe: path to the `claude` binary |
+| `CLAUDE_USAGE_BAR_PROJECTS` | `~/.claude/projects` | probe: where to look for session activity |
 
 To refresh more or less often, rename the plugin link (e.g. `claude-usage.1m.py`).
 

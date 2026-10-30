@@ -28,4 +28,4 @@ if [[ -n "$PLUGIN_DIR" && -L "$PLUGIN_DIR/claude-usage.5m.py" ]]; then
   rm "$PLUGIN_DIR/claude-usage.5m.py"
   echo "Removed SwiftBar plugin link"
 fi
-echo "Cache left at ~/.cache/claude-usage-bar (delete it if you like)."
+echo "Cache and auto-check state left at ~/.cache/claude-usage-bar (delete it if you like)."

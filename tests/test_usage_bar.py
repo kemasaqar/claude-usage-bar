@@ -36,7 +36,17 @@ class UsageBarTest(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         self.cache = Path(self.tmp.name) / "sub" / "usage.json"
-        self.env = {**os.environ, "CLAUDE_USAGE_BAR_CACHE": str(self.cache)}
+        # Empty projects dir + nonexistent claude: the plugin's background
+        # auto-check can never start a real Claude request during tests.
+        projects = Path(self.tmp.name) / "projects"
+        projects.mkdir()
+        self.env = {
+            **os.environ,
+            "CLAUDE_USAGE_BAR_CACHE": str(self.cache),
+            "CLAUDE_USAGE_BAR_PROJECTS": str(projects),
+            "CLAUDE_USAGE_BAR_CLAUDE": str(Path(self.tmp.name) / "no-claude"),
+            "PATH": "/usr/bin:/bin",
+        }
         self.now = int(time.time())
 
     def tearDown(self):

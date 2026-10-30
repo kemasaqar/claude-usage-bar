@@ -14,6 +14,8 @@ from __future__ import annotations
 
 import json
 import os
+import subprocess
+import sys
 import time
 from datetime import datetime
 from pathlib import Path
@@ -24,6 +26,10 @@ CACHE_PATH = Path(
         Path.home() / ".cache" / "claude-usage-bar" / "usage.json",
     )
 )
+# The plugin is symlinked into SwiftBar's folder; resolve back to the repo.
+PROBE = Path(__file__).resolve().parent.parent / "bridge" / "probe.py"
+PAUSE_FLAG = CACHE_PATH.parent / "auto-check-paused"
+PROBE_STATE = CACHE_PATH.parent / "probe.json"
 # Show a stale marker when nothing has changed for this long.
 STALE_AFTER_S = int(os.environ.get("CLAUDE_USAGE_BAR_STALE_MIN", "60")) * 60
 
@@ -80,24 +86,59 @@ def effective_pct(window: dict, now: float) -> tuple[float, bool]:
     return float(window["used_percentage"]), False
 
 
-def print_setup_help() -> None:
+def start_auto_check() -> None:
+    """Fire and forget; probe.py decides whether a check is actually needed."""
+    if PAUSE_FLAG.exists() or not PROBE.exists():
+        return
+    try:
+        subprocess.Popen(
+            [sys.executable, str(PROBE), "--auto"],
+            stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL, start_new_session=True,
+        )
+    except OSError:
+        pass
+
+
+def print_auto_check_menu(now: float) -> None:
+    try:
+        with PROBE_STATE.open() as f:
+            state = json.load(f)
+    except (OSError, ValueError):
+        state = {}
+    paused = PAUSE_FLAG.exists()
+    status = "paused" if paused else "on"
+    if state.get("last_run"):
+        mark = "✓" if state.get("ok") else "✗"
+        status += f" · last check {fmt_duration(now - state['last_run'])} ago {mark}"
+    print(f"Auto-check: {status} | size=11")
+    if state.get("last_run") and not state.get("ok") and state.get("error"):
+        print(f"--{state['error']} | size=11")
+    action = "--resume" if paused else "--pause"
+    label = "Resume auto-check" if paused else "Pause auto-check"
+    print(f"{label} | bash={PROBE} param1={action} terminal=false refresh=true")
+    print(f"Check now | bash={PROBE} param1=--now terminal=false refresh=true")
+
+
+def print_setup_help(now: float) -> None:
     print("✳ – | sfimage=gauge.with.dots.needle.0percent")
     print("---")
     print("No usage data yet")
     print(f"Waiting for {CACHE_PATH}")
-    print("--Set bridge/statusline.py as Claude Code's statusLine,")
-    print("--then send one message in Claude Code.")
+    print("--Send a message in Claude Code, or use Check now.")
     print("--Limits appear only on Pro/Max plans.")
     print("---")
+    print_auto_check_menu(now)
     print("Refresh | refresh=true")
 
 
 def main() -> None:
     now = time.time()
+    start_auto_check()
     cache = load_cache()
     windows = (cache or {}).get("windows") or {}
     if not windows:
-        print_setup_help()
+        print_setup_help(now)
         return
 
     updated_at = cache.get("updated_at", 0)
@@ -146,9 +187,8 @@ def main() -> None:
     print("---")
     ago = fmt_duration(now - updated_at)
     print(f"Last change {ago} ago" + (" (stale)" if stale else "") + " | size=11")
-    print("Updates when Claude Code gets a reply. | size=11 color=#888888")
-    print("claude.ai usage shows on your next reply. | size=11 color=#888888")
     print("---")
+    print_auto_check_menu(now)
     print("Refresh | refresh=true")
     print(f"Open cache file | bash=/usr/bin/open param1=-R param2={CACHE_PATH} terminal=false")
 

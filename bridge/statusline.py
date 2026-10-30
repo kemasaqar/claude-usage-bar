@@ -18,6 +18,7 @@ Stdlib only, Python 3.9+.
 """
 from __future__ import annotations
 
+import fcntl
 import json
 import os
 import sys
@@ -100,6 +101,22 @@ def merge(cache: dict, rate_limits: dict, now: float) -> bool:
     return changed
 
 
+def update_cache(rate_limits: dict, now: float, path: Path = CACHE_PATH) -> None:
+    """Merge a fresh reading under a lock (the bridge and probe.py can race).
+
+    `checked_at` records that some source delivered a reading now, even when
+    no number changed; probe.py uses it to skip checks that wouldn't add anything.
+    """
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with open(path.parent / ".lock", "w") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        cache = load_cache(path)
+        merge(cache, rate_limits, now)
+        if cache.get("windows"):
+            cache["checked_at"] = int(now)
+            write_cache(path, cache)
+
+
 def fmt_duration(seconds: float) -> str:
     seconds = max(0, int(seconds))
     days, rem = divmod(seconds, 86400)
@@ -144,9 +161,7 @@ def main() -> int:
     rate_limits = payload.get("rate_limits")
     if isinstance(rate_limits, dict):
         try:
-            cache = load_cache(CACHE_PATH)
-            if merge(cache, rate_limits, now):
-                write_cache(CACHE_PATH, cache)
+            update_cache(rate_limits, now)
         except OSError:
             pass  # never break the status line over a cache problem
 
