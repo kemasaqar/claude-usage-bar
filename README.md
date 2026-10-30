@@ -62,6 +62,7 @@ The plugin is symlinked, so edits in this folder take effect on the next refresh
 | `CLAUDE_USAGE_BAR_PROBE_MIN` | `5` | probe: minimum minutes between readings |
 | `CLAUDE_USAGE_BAR_CLAUDE` | found automatically | probe: path to the `claude` binary |
 | `CLAUDE_USAGE_BAR_PROJECTS` | `~/.claude/projects` | probe: where to look for session activity |
+| `CLAUDE_USAGE_BAR_REFRESH_URL` | `swiftbar://refreshplugin?name=claude-usage` | probe: asks SwiftBar to redraw after a check (`""` disables) |
 
 To refresh more or less often, rename the plugin link (e.g. `claude-usage.1m.py`).
 

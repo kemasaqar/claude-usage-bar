@@ -50,6 +50,7 @@ class ProbeTest(unittest.TestCase):
             "CLAUDE_USAGE_BAR_CACHE": str(self.cache),
             "CLAUDE_USAGE_BAR_PROJECTS": str(self.projects),
             "CLAUDE_USAGE_BAR_CLAUDE": str(fake),
+            "CLAUDE_USAGE_BAR_REFRESH_URL": "",  # never poke the real SwiftBar
             "FAKE_LOG": str(self.log),
             "FAKE_RESET": str(self.now + 3600),
         }

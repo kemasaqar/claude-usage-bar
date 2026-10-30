@@ -42,6 +42,12 @@ PROJECTS_DIR = Path(
 )
 INTERVAL_S = int(os.environ.get("CLAUDE_USAGE_BAR_PROBE_MIN", "5")) * 60
 TIMEOUT_S = 90
+# Redraw the menu bar as soon as a check finishes instead of on the next
+# 5-minute refresh. The redraw's own --auto run skips ("recent reading"),
+# so this can't loop. Set to "" to disable.
+REFRESH_URL = os.environ.get(
+    "CLAUDE_USAGE_BAR_REFRESH_URL", "swiftbar://refreshplugin?name=claude-usage"
+)
 
 CLAUDE_CANDIDATES = (
     os.environ.get("CLAUDE_USAGE_BAR_CLAUDE", ""),
@@ -181,7 +187,18 @@ def check(now: float) -> int:
             state.update(ok=False, error=str(e))
             print("error:", e, file=sys.stderr)
         write_cache(PROBE_STATE, state)
-        return 0 if state["ok"] else 1
+    request_redraw()
+    return 0 if state["ok"] else 1
+
+
+def request_redraw() -> None:
+    if not REFRESH_URL:
+        return
+    try:
+        subprocess.run(["/usr/bin/open", "-g", REFRESH_URL], timeout=10,
+                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    except (OSError, subprocess.TimeoutExpired):
+        pass
 
 
 def main() -> int:

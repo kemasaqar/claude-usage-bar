@@ -45,6 +45,7 @@ class UsageBarTest(unittest.TestCase):
             "CLAUDE_USAGE_BAR_CACHE": str(self.cache),
             "CLAUDE_USAGE_BAR_PROJECTS": str(projects),
             "CLAUDE_USAGE_BAR_CLAUDE": str(Path(self.tmp.name) / "no-claude"),
+            "CLAUDE_USAGE_BAR_REFRESH_URL": "",
             "PATH": "/usr/bin:/bin",
         }
         self.now = int(time.time())
