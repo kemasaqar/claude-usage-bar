@@ -74,6 +74,8 @@ Before installing, know that auto-check uses your account: while your 5-hour win
 
 The plugin is a symlink into this folder, so keep the folder where it is; `git pull` updates take effect on the next refresh. If you move it, run `install.sh` again.
 
+**Don't see it in the menu bar?** Menu bar managers hide new items. Bartender puts them in **Always Hidden**, and Ice in its hidden section: move the SwiftBar item to Shown in their settings. Bartender recognizes the item by the folder you installed from, so moving the folder and re-installing makes it hide the item again. On a MacBook with a notch, the item can also end up behind the notch.
+
 ## Settings (environment variables)
 
 | Variable | Default | Used by |

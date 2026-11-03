@@ -86,6 +86,8 @@ Done. The menu bar shows your 5-hour and weekly Claude limits (Pro/Max plans).
 - Auto-check: while your 5-hour window is open or you're using Claude Code, a tiny
   Haiku request (about 900 tokens) runs at most every 5 minutes to keep the numbers
   fresh. Turn it off with Pause auto-check in the menu.
-- Can't see it? A menu bar manager (Bartender, Ice) may be hiding it, or a notch.
+- Can't see it? Menu bar managers hide new items: Bartender puts them in Always
+  Hidden, Ice in its hidden section. Move it to Shown in their settings. On a
+  MacBook with a notch it can also end up behind the notch.
 - To start SwiftBar at login, turn on Launch at Login in its preferences.
 EOF
