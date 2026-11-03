@@ -1,6 +1,8 @@
 """Run with: python3 -m unittest discover -s tests"""
 from __future__ import annotations
 
+import base64
+import importlib.util
 import json
 import os
 import subprocess
@@ -123,6 +125,32 @@ class UsageBarTest(unittest.TestCase):
         title = self.plugin().splitlines()[0]
         self.assertTrue(title.startswith("92% · 41% |"), title)
         self.assertIn("color=#E5484D", title)
+
+    def test_plugin_icon_shows_what_is_left(self):
+        spec = importlib.util.spec_from_file_location("plugin", PLUGIN)
+        plugin = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(plugin)
+        self.bridge(payload(five=(10, self.now + 3600), seven=(30, self.now + 86400)))
+        title = self.plugin().splitlines()[0]
+        encoded = title.split("templateImage=")[1].split()[0]
+        self.assertTrue(base64.b64decode(encoded).startswith(b"\x89PNG\r\n\x1a\n"))
+        # 30% used (the higher of the two) -> 70% full
+        self.assertEqual(encoded, plugin.png_base64(plugin.icon_alpha(70)))
+
+    def test_icon_fills_from_bottom(self):
+        spec = importlib.util.spec_from_file_location("plugin", PLUGIN)
+        plugin = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(plugin)
+        size = plugin.ICON_PT * plugin.ICON_SCALE
+        mid = size // 2
+        empty, half, full = (plugin.icon_alpha(p) for p in (0, 50, 100))
+        self.assertEqual(empty[mid][mid], 0)              # only the ring at 0%
+        self.assertGreater(empty[mid][1], 0)
+        self.assertEqual(half[mid + 4][mid], 255)          # below the level
+        self.assertEqual(half[mid - 4][mid], 0)            # above the level
+        self.assertEqual(full[4][mid], 255)                # full to the top
+        total = [sum(map(sum, plugin.icon_alpha(p))) for p in (0, 25, 50, 75, 100)]
+        self.assertEqual(total, sorted(total))
 
     def test_plugin_treats_passed_window_as_reset(self):
         self.cache.parent.mkdir(parents=True)

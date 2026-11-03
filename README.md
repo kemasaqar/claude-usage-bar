@@ -3,7 +3,9 @@
 Shows your Claude plan limits (5-hour session and 7-day weekly) in the macOS menu bar, refreshed every 5 minutes.
 
 ```
-◔ 23% · 41%          ← menu bar (orange at 70%, red at 90%, ⚠ when stale)
+◒ 23% · 41%          ← menu bar (circle shows what's left of the higher of the two, like a
+                        battery: full at 0% used, drains from the top; orange at 70%,
+                        red at 90%, ⚠ when stale)
 ─────────────────
 5-hour ████░░░░░░░░░░░░░░░░  23.5%
 Resets in 2h 14m (16:30)
@@ -65,6 +67,8 @@ The plugin is symlinked, so edits in this folder take effect on the next refresh
 | `CLAUDE_USAGE_BAR_REFRESH_URL` | `swiftbar://refreshplugin?name=claude-usage` | probe: asks SwiftBar to redraw after a check (`""` disables) |
 
 To refresh more or less often, rename the plugin link (e.g. `claude-usage.1m.py`).
+
+The circle icon is drawn as a PNG by the plugin itself (no image files). Its size and outline width are `ICON_PT` and `RING_PT` at the top of `swiftbar/claude-usage.5m.py`.
 
 ## When it breaks
 

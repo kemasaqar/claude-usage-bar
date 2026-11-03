@@ -12,11 +12,14 @@ Stdlib only, Python 3.9+.
 """
 from __future__ import annotations
 
+import base64
 import json
 import os
+import struct
 import subprocess
 import sys
 import time
+import zlib
 from datetime import datetime
 from pathlib import Path
 
@@ -38,6 +41,11 @@ FONT = "font=Menlo size=12"
 # Lines without an action render as disabled (grey) menu items; an explicit
 # color keeps them readable. SwiftBar takes "light,dark".
 TEXT_COLOR = "#1D1D1F,#F5F5F7"
+# Menu bar icon: a circle that works like a battery. Full when nothing is
+# used, draining from the top as usage grows, empty at 100%.
+ICON_PT = 16     # canvas size in points
+ICON_SCALE = 2   # pixels per point, so it stays sharp on Retina screens
+RING_PT = 1.5    # outline width
 
 
 def color_for(pct: float) -> str:
@@ -51,6 +59,55 @@ def color_for(pct: float) -> str:
 def bar(pct: float, width: int = 20) -> str:
     filled = round(max(0.0, min(100.0, pct)) / 100 * width)
     return "█" * filled + "░" * (width - filled)
+
+
+def icon_alpha(pct: float) -> list[bytearray]:
+    """Coverage (0-255) per pixel: a ring, plus its inside filled from the
+    bottom up to pct% of the height. 4x4 supersampling smooths the edges."""
+    size = ICON_PT * ICON_SCALE
+    c = size / 2
+    r_out = c - 0.5 * ICON_SCALE  # small margin so the ring isn't clipped
+    r_in = r_out - RING_PT * ICON_SCALE
+    level = c + r_in - max(0.0, min(100.0, pct)) / 100 * 2 * r_in
+    n = 4
+    rows = []
+    for py in range(size):
+        row = bytearray(size)
+        for px in range(size):
+            hits = 0
+            for sy in range(n):
+                y = py + (sy + 0.5) / n
+                for sx in range(n):
+                    x = px + (sx + 0.5) / n
+                    d2 = (x - c) ** 2 + (y - c) ** 2
+                    if d2 <= r_out * r_out and (d2 >= r_in * r_in or y >= level):
+                        hits += 1
+            row[px] = hits * 255 // (n * n)
+        rows.append(row)
+    return rows
+
+
+def png_base64(alpha_rows: list[bytearray]) -> str:
+    """Black RGBA PNG with the given alpha. SwiftBar's templateImage tints it
+    to match the menu bar. The DPI makes macOS draw it at ICON_PT points."""
+    h, w = len(alpha_rows), len(alpha_rows[0])
+    raw = b"".join(
+        b"\x00" + bytes(v for a in row for v in (0, 0, 0, a)) for row in alpha_rows
+    )
+
+    def chunk(tag: bytes, data: bytes) -> bytes:
+        crc = zlib.crc32(tag + data) & 0xFFFFFFFF
+        return struct.pack(">I", len(data)) + tag + data + struct.pack(">I", crc)
+
+    ppm = round(72 * ICON_SCALE / 0.0254)  # pixels per meter
+    png = (
+        b"\x89PNG\r\n\x1a\n"
+        + chunk(b"IHDR", struct.pack(">IIBBBBB", w, h, 8, 6, 0, 0, 0))
+        + chunk(b"pHYs", struct.pack(">IIB", ppm, ppm, 1))
+        + chunk(b"IDAT", zlib.compress(raw, 9))
+        + chunk(b"IEND", b"")
+    )
+    return base64.b64encode(png).decode()
 
 
 def fmt_duration(seconds: float) -> str:
@@ -126,7 +183,7 @@ def print_auto_check_menu(now: float) -> None:
 
 
 def print_setup_help(now: float) -> None:
-    print("✳ – | sfimage=gauge.with.dots.needle.0percent")
+    print(f"– | templateImage={png_base64(icon_alpha(0))}")
     print("---")
     print("No usage data yet")
     print(f"Waiting for {CACHE_PATH}")
@@ -170,8 +227,7 @@ def main() -> None:
     title = " · ".join(title_parts) or "–"
     if stale:
         title += " ⚠"
-    needle = min((0, 33, 50, 67, 100), key=lambda n: abs(n - worst))
-    attrs = [f"sfimage=gauge.with.dots.needle.{needle}percent"]
+    attrs = [f"templateImage={png_base64(icon_alpha(100 - worst))}"]
     color = color_for(worst)
     if color:
         attrs.append(f"color={color}")
