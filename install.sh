@@ -1,56 +1,87 @@
 #!/usr/bin/env bash
-# Wires the bridge into Claude Code and links the plugin into SwiftBar.
-# Safe to re-run. Usage: ./install.sh [--force]   (--force replaces an existing statusLine)
+# Sets up claude-usage-bar: checks requirements, installs SwiftBar if needed,
+# points Claude Code's statusLine at the bridge (keeping yours, if you have
+# one) and links the plugin into SwiftBar. Safe to re-run.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")" && pwd)"
 BRIDGE="$ROOT/bridge/statusline.py"
 PLUGIN="$ROOT/swiftbar/claude-usage.5m.py"
 SETTINGS="$HOME/.claude/settings.json"
-FORCE="${1:-}"
+SWIFTBAR_ID="com.ameba.SwiftBar"
+DEFAULT_PLUGIN_DIR="$HOME/Library/Application Support/SwiftBar/Plugins"
 
-chmod +x "$BRIDGE" "$PLUGIN"
+fail() { printf '\nError: %s\n' "$*" >&2; exit 1; }
 
-# 1. Claude Code statusLine -> bridge
-python3 - "$SETTINGS" "$BRIDGE" "$FORCE" <<'PY'
-import json, shutil, sys, time
-from pathlib import Path
+# 1. Requirements
+[[ "$(uname -s)" == Darwin ]] || fail "claude-usage-bar only runs on macOS."
+# Without Apple's Command Line Tools, /usr/bin/python3 is a stub that pops up
+# an install dialog, and the menu bar would stay blank.
+xcode-select -p >/dev/null 2>&1 \
+  || fail "Apple's Command Line Tools are missing. Run: xcode-select --install, then re-run ./install.sh"
+command -v python3 >/dev/null || fail "python3 not found."
+python3 -c 'import sys; sys.exit(sys.version_info < (3, 9))' \
+  || fail "Python 3.9 or newer is needed (found $(python3 -V 2>&1))."
 
-settings_path, bridge, force = Path(sys.argv[1]), sys.argv[2], sys.argv[3] == "--force"
-settings = json.loads(settings_path.read_text()) if settings_path.exists() else {}
-want = {"type": "command", "command": bridge}
-current = settings.get("statusLine")
+CLAUDE=""
+for c in "$(command -v claude || true)" "$HOME/.local/bin/claude" "$HOME/.claude/local/claude" \
+         /opt/homebrew/bin/claude /usr/local/bin/claude; do
+  if [[ -n "$c" && -x "$c" ]]; then CLAUDE="$c"; break; fi
+done
+[[ -n "$CLAUDE" ]] || echo "Warning: Claude Code (claude) not found. Install it, or auto-check can't run."
 
-if current == want:
-    print(f"statusLine already set in {settings_path}")
-    sys.exit(0)
-if current and not force:
-    print(f"A statusLine is already configured in {settings_path}:")
-    print(f"  {json.dumps(current)}")
-    print("Re-run with --force to replace it (a backup is kept).")
-    sys.exit(1)
-if settings_path.exists():
-    backup = settings_path.with_name(f"settings.json.bak-{int(time.time())}")
-    shutil.copy2(settings_path, backup)
-    print(f"Backed up {settings_path} -> {backup.name}")
-settings["statusLine"] = want
-settings_path.parent.mkdir(parents=True, exist_ok=True)
-settings_path.write_text(json.dumps(settings, indent=2) + "\n")
-print(f"Set statusLine in {settings_path}")
-PY
-
-# 2. SwiftBar plugin symlink
-PLUGIN_DIR="$(defaults read com.ameba.SwiftBar PluginDirectory 2>/dev/null || true)"
-PLUGIN_DIR="${PLUGIN_DIR/#\~/$HOME}"
-if [[ -z "$PLUGIN_DIR" ]]; then
-  echo
-  echo "SwiftBar isn't set up yet. Install it, open it once, and pick a plugin folder:"
-  echo "  brew install --cask swiftbar"
-  echo "Then re-run ./install.sh"
-  exit 0
+# 2. SwiftBar, the app that hosts the menu bar item
+find_swiftbar() {
+  for app in /Applications/SwiftBar.app "$HOME/Applications/SwiftBar.app"; do
+    [[ -d "$app" ]] && { echo "$app"; return; }
+  done
+  mdfind "kMDItemCFBundleIdentifier == '$SWIFTBAR_ID'" 2>/dev/null | head -1
+}
+SWIFTBAR_APP="$(find_swiftbar)"
+if [[ -z "$SWIFTBAR_APP" ]]; then
+  command -v brew >/dev/null \
+    || fail "SwiftBar isn't installed. Get it from https://swiftbar.app, then re-run ./install.sh"
+  if [[ -t 0 ]]; then
+    read -r -p "SwiftBar (shows the menu bar item) isn't installed. Install it with Homebrew? [Y/n] " answer
+    [[ "$answer" =~ ^[Nn] ]] && fail "SwiftBar is required."
+  fi
+  brew install --cask swiftbar
+  SWIFTBAR_APP="$(find_swiftbar)"
+  [[ -n "$SWIFTBAR_APP" ]] || fail "SwiftBar installed, but its app wasn't found."
 fi
-mkdir -p "$PLUGIN_DIR"
+
+# SwiftBar asks for a plugin folder on first launch unless one is set and
+# exists, so set it up front.
+PLUGIN_DIR="$(defaults read "$SWIFTBAR_ID" PluginDirectory 2>/dev/null || true)"
+PLUGIN_DIR="${PLUGIN_DIR/#\~/$HOME}"
+if [[ -z "$PLUGIN_DIR" || ! -d "$PLUGIN_DIR" ]]; then
+  PLUGIN_DIR="$DEFAULT_PLUGIN_DIR"
+  mkdir -p "$PLUGIN_DIR"
+  pkill -x SwiftBar 2>/dev/null && sleep 1  # it would overwrite the setting on quit
+  defaults write "$SWIFTBAR_ID" PluginDirectory "$PLUGIN_DIR"
+  echo "Set SwiftBar's plugin folder to $PLUGIN_DIR"
+fi
+
+# 3. Claude Code statusLine -> bridge
+chmod +x "$BRIDGE" "$PLUGIN" "$ROOT/bridge/probe.py"
+python3 "$ROOT/bridge/setup_settings.py" install "$SETTINGS" "$BRIDGE"
+
+# 4. Plugin
 ln -sf "$PLUGIN" "$PLUGIN_DIR/claude-usage.5m.py"
 echo "Linked plugin into $PLUGIN_DIR"
-open -g "swiftbar://refreshallplugins" 2>/dev/null || true
-echo "Done. Send a message in Claude Code to populate the menu bar."
+if pgrep -xq SwiftBar; then
+  open -g "swiftbar://refreshallplugins"
+else
+  open -a "$SWIFTBAR_APP"
+fi
+
+cat <<EOF
+
+Done. The menu bar shows your 5-hour and weekly Claude limits (Pro/Max plans).
+- First reading: send a message in Claude Code, or open the menu and pick Check now.
+- Auto-check: while your 5-hour window is open or you're using Claude Code, a tiny
+  Haiku request (about 900 tokens) runs at most every 5 minutes to keep the numbers
+  fresh. Turn it off with Pause auto-check in the menu.
+- Can't see it? A menu bar manager (Bartender, Ice) may be hiding it, or a notch.
+- To start SwiftBar at login, turn on Launch at Login in its preferences.
+EOF

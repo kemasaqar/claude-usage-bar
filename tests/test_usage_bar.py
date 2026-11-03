@@ -42,9 +42,11 @@ class UsageBarTest(unittest.TestCase):
         # auto-check can never start a real Claude request during tests.
         projects = Path(self.tmp.name) / "projects"
         projects.mkdir()
+        self.config = Path(self.tmp.name) / "config.json"
         self.env = {
             **os.environ,
             "CLAUDE_USAGE_BAR_CACHE": str(self.cache),
+            "CLAUDE_USAGE_BAR_CONFIG": str(self.config),
             "CLAUDE_USAGE_BAR_PROJECTS": str(projects),
             "CLAUDE_USAGE_BAR_CLAUDE": str(Path(self.tmp.name) / "no-claude"),
             "CLAUDE_USAGE_BAR_REFRESH_URL": "",
@@ -115,6 +117,21 @@ class UsageBarTest(unittest.TestCase):
         self.assertEqual(self.bridge("not json"), "")
         self.assertEqual(self.bridge(json.dumps({"rate_limits": {"five_hour": "x"}})), "")
         self.assertFalse(self.cache.exists())
+
+    def keep_original(self, command: str):
+        self.config.write_text(json.dumps(
+            {"original_status_line": {"type": "command", "command": command}}))
+
+    def test_original_status_line_is_shown_and_cache_still_updated(self):
+        self.keep_original("printf 'mine: '; head -c 12")  # echoes part of its stdin
+        out = self.bridge(payload(five=(23.5, self.now + 3600)))
+        self.assertEqual(out, 'mine: {"model": {"')
+        self.assertEqual(self.cached()["five_hour"]["used_percentage"], 23.5)
+
+    def test_failing_original_status_line_falls_back_to_ours(self):
+        self.keep_original("echo broken; exit 3")
+        out = self.bridge(payload(five=(23.5, self.now + 3600)))
+        self.assertIn("5h 24%", out)
 
     def test_plugin_without_cache_shows_setup_help(self):
         out = self.plugin()

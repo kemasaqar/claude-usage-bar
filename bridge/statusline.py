@@ -6,7 +6,9 @@ stdin. We do two things with it:
 
   1. Merge the plan rate limits (`rate_limits.*`) into a small cache file that
      the SwiftBar plugin reads.
-  2. Print a one-line status line for the terminal.
+  2. Print a status line for the terminal. If you already had a status line
+     when you installed, install.sh saved it in the config file; it gets the
+     same input and its output is shown instead of ours.
 
 Merge rule per window (five_hour, seven_day, spend_limit): usage within a
 window only goes up, so an incoming value is accepted only if it belongs to a
@@ -21,6 +23,7 @@ from __future__ import annotations
 import fcntl
 import json
 import os
+import subprocess
 import sys
 import tempfile
 import time
@@ -32,7 +35,15 @@ CACHE_PATH = Path(
         Path.home() / ".cache" / "claude-usage-bar" / "usage.json",
     )
 )
+# Not in the cache folder: deleting the cache must not lose your status line.
+CONFIG_PATH = Path(
+    os.environ.get(
+        "CLAUDE_USAGE_BAR_CONFIG",
+        Path.home() / ".config" / "claude-usage-bar" / "config.json",
+    )
+)
 WINDOWS = ("five_hour", "seven_day", "spend_limit")
+CHAIN_TIMEOUT_S = 5
 
 
 def load_cache(path: Path) -> dict:
@@ -149,10 +160,29 @@ def render_status_line(payload: dict, now: float) -> str:
     return " · ".join(parts)
 
 
+def run_original(stdin: str) -> str | None:
+    """Output of the status line you had before installing, or None if there
+    wasn't one or it failed, in which case ours is shown."""
+    original = load_cache(CONFIG_PATH).get("original_status_line") or {}
+    command = original.get("command") if isinstance(original, dict) else None
+    if not isinstance(command, str) or not command.strip():
+        return None
+    try:
+        proc = subprocess.run(
+            command, shell=True, input=stdin, capture_output=True, text=True,
+            timeout=CHAIN_TIMEOUT_S,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    out = proc.stdout.rstrip("\n")
+    return out if proc.returncode == 0 and out else None
+
+
 def main() -> int:
     now = time.time()
+    stdin = sys.stdin.read()
     try:
-        payload = json.load(sys.stdin)
+        payload = json.loads(stdin)
     except ValueError:
         payload = {}
     if not isinstance(payload, dict):
@@ -165,7 +195,8 @@ def main() -> int:
         except OSError:
             pass  # never break the status line over a cache problem
 
-    print(render_status_line(payload, now))
+    original = run_original(stdin)
+    print(original if original is not None else render_status_line(payload, now))
     return 0
 
 

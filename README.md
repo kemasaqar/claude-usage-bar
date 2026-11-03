@@ -54,20 +54,32 @@ A check runs `claude -p --model haiku` with no tools, no MCP servers, no user se
 
 ## Install
 
+Needs macOS, a Claude Pro or Max plan, Claude Code, and Apple's Command Line Tools (`xcode-select --install`; you have them if `git` works).
+
 ```bash
-brew install --cask swiftbar   # open it once and choose a plugin folder
-./install.sh                   # sets Claude Code's statusLine + links the plugin
+git clone <this repo> ~/claude-usage-bar
+~/claude-usage-bar/install.sh
 ```
 
-`install.sh` backs up `~/.claude/settings.json` before changing it and refuses to replace an existing `statusLine` unless you pass `--force`. `./uninstall.sh` reverses both steps.
+`install.sh`:
 
-The plugin is symlinked, so edits in this folder take effect on the next refresh. If this volume isn't mounted, the status line and plugin stop working until it is.
+1. Checks the requirements above.
+2. Installs [SwiftBar](https://swiftbar.app) with Homebrew if it's missing (it asks first), and sets its plugin folder so it doesn't ask on first launch.
+3. Points Claude Code's `statusLine` at the bridge. If you already have a status line, it's kept: it's saved in `~/.config/claude-usage-bar/config.json`, the bridge runs it with the same input, and your terminal shows its output as before. `~/.claude/settings.json` is backed up first.
+4. Links the plugin into SwiftBar and starts it.
+
+Before installing, know that auto-check uses your account: while your 5-hour window is open or you're using Claude Code, it sends a tiny Haiku request (about 900 tokens) at most every 5 minutes. **Pause auto-check** in the menu turns it off.
+
+`./uninstall.sh` puts your original status line back (or removes ours) and removes the plugin link. It leaves SwiftBar installed.
+
+The plugin is a symlink into this folder, so keep the folder where it is; `git pull` updates take effect on the next refresh. If you move it, run `install.sh` again.
 
 ## Settings (environment variables)
 
 | Variable | Default | Used by |
 |---|---|---|
 | `CLAUDE_USAGE_BAR_CACHE` | `~/.cache/claude-usage-bar/usage.json` | both |
+| `CLAUDE_USAGE_BAR_CONFIG` | `~/.config/claude-usage-bar/config.json` | bridge: your original status line, saved by `install.sh` |
 | `CLAUDE_USAGE_BAR_STALE_MIN` | `60` | plugin: minutes without a reading before ⚠ |
 | `CLAUDE_USAGE_BAR_PROBE_MIN` | `5` | probe: minimum minutes between readings |
 | `CLAUDE_USAGE_BAR_CLAUDE` | found automatically | probe: path to the `claude` binary |
