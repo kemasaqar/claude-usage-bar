@@ -46,6 +46,7 @@ TEXT_COLOR = "#1D1D1F,#F5F5F7"
 ICON_PT = 16     # canvas size in points
 ICON_SCALE = 2   # pixels per point, so it stays sharp on Retina screens
 RING_PT = 1.5    # outline width
+GAP_PT = 1.5     # space between the outline and the fill
 
 
 def color_for(pct: float) -> str:
@@ -62,13 +63,14 @@ def bar(pct: float, width: int = 20) -> str:
 
 
 def icon_alpha(pct: float) -> list[bytearray]:
-    """Coverage (0-255) per pixel: a ring, plus its inside filled from the
-    bottom up to pct% of the height. 4x4 supersampling smooths the edges."""
+    """Coverage (0-255) per pixel: a ring, a gap, then a disc filled from the
+    bottom up to pct% of its height. 4x4 supersampling smooths the edges."""
     size = ICON_PT * ICON_SCALE
     c = size / 2
     r_out = c - 0.5 * ICON_SCALE  # small margin so the ring isn't clipped
     r_in = r_out - RING_PT * ICON_SCALE
-    level = c + r_in - max(0.0, min(100.0, pct)) / 100 * 2 * r_in
+    r_fill = r_in - GAP_PT * ICON_SCALE
+    level = c + r_fill - max(0.0, min(100.0, pct)) / 100 * 2 * r_fill
     n = 4
     rows = []
     for py in range(size):
@@ -80,7 +82,8 @@ def icon_alpha(pct: float) -> list[bytearray]:
                 for sx in range(n):
                     x = px + (sx + 0.5) / n
                     d2 = (x - c) ** 2 + (y - c) ** 2
-                    if d2 <= r_out * r_out and (d2 >= r_in * r_in or y >= level):
+                    ring = r_in * r_in <= d2 <= r_out * r_out
+                    if ring or (d2 <= r_fill * r_fill and y >= level):
                         hits += 1
             row[px] = hits * 255 // (n * n)
         rows.append(row)

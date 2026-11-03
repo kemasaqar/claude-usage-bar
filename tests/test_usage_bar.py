@@ -148,7 +148,8 @@ class UsageBarTest(unittest.TestCase):
         self.assertGreater(empty[mid][1], 0)
         self.assertEqual(half[mid + 4][mid], 255)          # below the level
         self.assertEqual(half[mid - 4][mid], 0)            # above the level
-        self.assertEqual(full[4][mid], 255)                # full to the top
+        self.assertEqual(full[mid - 8][mid], 255)          # full to the top
+        self.assertEqual(full[mid][mid - 11], 0)           # gap before the ring
         total = [sum(map(sum, plugin.icon_alpha(p))) for p in (0, 25, 50, 75, 100)]
         self.assertEqual(total, sorted(total))
 

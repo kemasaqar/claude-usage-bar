@@ -68,7 +68,7 @@ The plugin is symlinked, so edits in this folder take effect on the next refresh
 
 To refresh more or less often, rename the plugin link (e.g. `claude-usage.1m.py`).
 
-The circle icon is drawn as a PNG by the plugin itself (no image files). Its size and outline width are `ICON_PT` and `RING_PT` at the top of `swiftbar/claude-usage.5m.py`.
+The circle icon is drawn as a PNG by the plugin itself (no image files). Its size, outline width and the gap before the fill are `ICON_PT`, `RING_PT` and `GAP_PT` at the top of `swiftbar/claude-usage.5m.py`.
 
 ## When it breaks
 
