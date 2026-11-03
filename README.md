@@ -57,7 +57,7 @@ A check runs `claude -p --model haiku` with no tools, no MCP servers, no user se
 Needs macOS, a Claude Pro or Max plan, Claude Code, and Apple's Command Line Tools (`xcode-select --install`; you have them if `git` works).
 
 ```bash
-git clone <this repo> ~/claude-usage-bar
+git clone https://github.com/kemasaqar/claude-usage-bar.git ~/claude-usage-bar
 ~/claude-usage-bar/install.sh
 ```
 
