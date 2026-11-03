@@ -13,6 +13,14 @@ Resets in 2h 14m (16:30)
 Resets in 3d 4h (Mon 09:00)
 ```
 
+![The menu bar icon at 0%, 10%, ... 100% usage, left to right](docs/icon-levels.png)
+
+The icon at 0%, 10%, ... 100% usage, left to right. At real size in the menu bar (5-hour usage · weekly 13%):
+
+![The menu bar item at real size for each usage level](docs/menu-bar.svg)
+
+Numbers turn orange at 70% and red at 90%; the circle stays white.
+
 ## How it works
 
 ```
@@ -68,7 +76,7 @@ The plugin is symlinked, so edits in this folder take effect on the next refresh
 
 To refresh more or less often, rename the plugin link (e.g. `claude-usage.1m.py`).
 
-The circle icon is drawn as a PNG by the plugin itself (no image files). Its size, outline width and the gap before the fill are `ICON_PT`, `RING_PT` and `GAP_PT` at the top of `swiftbar/claude-usage.5m.py`.
+The circle icon is drawn as a PNG by the plugin itself (no image files). Its size, outline width and the gap before the fill are `ICON_PT`, `RING_PT` and `GAP_PT` at the top of `swiftbar/claude-usage.5m.py`. After changing them, run `python3 scripts/render_icon_preview.py` to redraw the preview images above.
 
 ## When it breaks
 
