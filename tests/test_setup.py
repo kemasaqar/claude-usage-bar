@@ -66,6 +66,14 @@ class SetupSettingsTest(unittest.TestCase):
         self.assertEqual(self.read_settings()["statusLine"],
                          {"type": "command", "command": BRIDGE, "padding": 0})
 
+    def test_install_and_uninstall_with_non_object_status_line(self):
+        self.write_settings({"statusLine": "echo hi"})
+        self.assertIn("Kept your status line: echo hi", self.run_setup("install"))
+        self.assertEqual(self.read_settings()["statusLine"],
+                         {"type": "command", "command": BRIDGE})
+        self.run_setup("uninstall")
+        self.assertEqual(self.read_settings()["statusLine"], "echo hi")
+
     def test_reinstall_changes_nothing(self):
         self.write_settings({"statusLine": MINE})
         self.run_setup("install")

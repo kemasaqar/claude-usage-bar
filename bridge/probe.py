@@ -41,7 +41,7 @@ PROJECTS_DIR = Path(
     os.environ.get("CLAUDE_USAGE_BAR_PROJECTS", Path.home() / ".claude" / "projects")
 )
 INTERVAL_S = int(os.environ.get("CLAUDE_USAGE_BAR_PROBE_MIN", "5")) * 60
-TIMEOUT_S = 90
+TIMEOUT_S = float(os.environ.get("CLAUDE_USAGE_BAR_PROBE_TIMEOUT_S", "90"))
 # Redraw the menu bar as soon as a check finishes instead of on the next
 # 5-minute refresh. The redraw's own --auto run skips ("recent reading"),
 # so this can't loop. Set to "" to disable.
@@ -50,7 +50,6 @@ REFRESH_URL = os.environ.get(
 )
 
 CLAUDE_CANDIDATES = (
-    os.environ.get("CLAUDE_USAGE_BAR_CLAUDE", ""),
     shutil.which("claude") or "",
     str(Path.home() / ".local" / "bin" / "claude"),
     str(Path.home() / ".claude" / "local" / "claude"),
@@ -60,7 +59,10 @@ CLAUDE_CANDIDATES = (
 
 
 def find_claude() -> str | None:
-    for path in CLAUDE_CANDIDATES:
+    """CLAUDE_USAGE_BAR_CLAUDE, if set, is the only one tried: a wrong path
+    should show up as an error, not quietly fall back to another claude."""
+    override = os.environ.get("CLAUDE_USAGE_BAR_CLAUDE")
+    for path in (override,) if override else CLAUDE_CANDIDATES:
         if path and os.access(path, os.X_OK):
             return path
     return None

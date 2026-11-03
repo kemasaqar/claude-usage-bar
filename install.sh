@@ -10,6 +10,8 @@ PLUGIN="$ROOT/swiftbar/claude-usage.5m.py"
 SETTINGS="$HOME/.claude/settings.json"
 SWIFTBAR_ID="com.ameba.SwiftBar"
 DEFAULT_PLUGIN_DIR="$HOME/Library/Application Support/SwiftBar/Plugins"
+# Folders to look for SwiftBar.app in, colon-separated (tests override this).
+APP_DIRS="${CLAUDE_USAGE_BAR_APP_DIRS:-/Applications:$HOME/Applications}"
 
 fail() { printf '\nError: %s\n' "$*" >&2; exit 1; }
 
@@ -32,8 +34,10 @@ done
 
 # 2. SwiftBar, the app that hosts the menu bar item
 find_swiftbar() {
-  for app in /Applications/SwiftBar.app "$HOME/Applications/SwiftBar.app"; do
-    [[ -d "$app" ]] && { echo "$app"; return; }
+  local dir dirs
+  IFS=: read -ra dirs <<< "$APP_DIRS"
+  for dir in "${dirs[@]}"; do
+    [[ -d "$dir/SwiftBar.app" ]] && { echo "$dir/SwiftBar.app"; return; }
   done
   mdfind "kMDItemCFBundleIdentifier == '$SWIFTBAR_ID'" 2>/dev/null | head -1
 }

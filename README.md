@@ -82,7 +82,9 @@ The plugin is a symlink into this folder, so keep the folder where it is; `git p
 | `CLAUDE_USAGE_BAR_CONFIG` | `~/.config/claude-usage-bar/config.json` | bridge: your original status line, saved by `install.sh` |
 | `CLAUDE_USAGE_BAR_STALE_MIN` | `60` | plugin: minutes without a reading before ⚠ |
 | `CLAUDE_USAGE_BAR_PROBE_MIN` | `5` | probe: minimum minutes between readings |
-| `CLAUDE_USAGE_BAR_CLAUDE` | found automatically | probe: path to the `claude` binary |
+| `CLAUDE_USAGE_BAR_CLAUDE` | found automatically | probe: path to the `claude` binary (when set, only this one is tried) |
+| `CLAUDE_USAGE_BAR_PROBE_TIMEOUT_S` | `90` | probe: seconds before a check gives up |
+| `CLAUDE_USAGE_BAR_CHAIN_TIMEOUT_S` | `5` | bridge: seconds to wait for your original status line before showing ours |
 | `CLAUDE_USAGE_BAR_PROJECTS` | `~/.claude/projects` | probe: where to look for session activity |
 | `CLAUDE_USAGE_BAR_REFRESH_URL` | `swiftbar://refreshplugin?name=claude-usage` | probe: asks SwiftBar to redraw after a check (`""` disables) |
 
@@ -99,6 +101,8 @@ All field parsing lives in `parse_window()` in `bridge/statusline.py`. If Claude
 ```bash
 python3 -m unittest discover -s tests -v
 ```
+
+Nothing in the tests touches your real setup. They use temporary cache, config and settings files, and a fake `claude`. `tests/test_install.py` runs the real `install.sh` and `uninstall.sh` with a temporary `HOME` and fake `brew`, `defaults`, `open` and other system commands first on `PATH`.
 
 ## License
 

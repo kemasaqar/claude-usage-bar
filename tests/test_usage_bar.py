@@ -133,6 +133,15 @@ class UsageBarTest(unittest.TestCase):
         out = self.bridge(payload(five=(23.5, self.now + 3600)))
         self.assertIn("5h 24%", out)
 
+    def test_slow_original_status_line_falls_back_in_time(self):
+        # Not `exec sleep`: the shell's child keeps the output pipe open.
+        self.keep_original("sleep 4; echo late")
+        self.env["CLAUDE_USAGE_BAR_CHAIN_TIMEOUT_S"] = "0.5"
+        start = time.time()
+        out = self.bridge(payload(five=(23.5, self.now + 3600)))
+        self.assertLess(time.time() - start, 2.5)
+        self.assertIn("5h 24%", out)
+
     def test_plugin_without_cache_shows_setup_help(self):
         out = self.plugin()
         self.assertIn("No usage data yet", out)
@@ -169,6 +178,63 @@ class UsageBarTest(unittest.TestCase):
         self.assertEqual(full[mid][mid - 11], 0)           # gap before the ring
         total = [sum(map(sum, plugin.icon_alpha(p))) for p in (0, 25, 50, 75, 100)]
         self.assertEqual(total, sorted(total))
+
+    def fresh_cache(self, **windows):
+        """A reading taken just now, so the plugin's background auto-check
+        skips ("recent reading") and can't race the test."""
+        self.cache.parent.mkdir(parents=True, exist_ok=True)
+        self.cache.write_text(json.dumps({
+            "updated_at": self.now, "checked_at": self.now, "windows": windows,
+        }))
+
+    def write_probe_state(self, **state):
+        (self.cache.parent / "probe.json").write_text(json.dumps(state))
+
+    def open_window(self, pct, seconds_left=3600):
+        return {"used_percentage": pct, "resets_at": self.now + seconds_left}
+
+    def test_menu_shows_paused(self):
+        self.fresh_cache(five_hour=self.open_window(10))
+        (self.cache.parent / "auto-check-paused").touch()
+        out = self.plugin()
+        self.assertIn("Auto-check: paused", out)
+        self.assertIn("Resume auto-check |", out)
+        self.assertNotIn("Pause auto-check |", out)
+
+    def test_menu_shows_idle_and_last_good_check(self):
+        self.fresh_cache(five_hour=self.open_window(10))
+        self.write_probe_state(last_run=self.now - 120, ok=True,
+                               skipped="idle, no open 5-hour window")
+        out = self.plugin()
+        self.assertIn("Auto-check: on · idle, waiting for activity · last check 2m ago ✓", out)
+        self.assertIn("Pause auto-check |", out)
+
+    def test_menu_shows_failed_check_with_error(self):
+        self.fresh_cache(five_hour=self.open_window(10))
+        self.write_probe_state(last_run=self.now - 60, ok=False, error="Invalid API key")
+        out = self.plugin()
+        self.assertIn("last check 1m ago ✗", out)
+        self.assertIn("--Invalid API key |", out)
+
+    def test_plugin_orange_from_70(self):
+        self.fresh_cache(five_hour=self.open_window(75), seven_day=self.open_window(20, 86400))
+        title = self.plugin().splitlines()[0]
+        self.assertTrue(title.startswith("75% · 20% |"), title)
+        self.assertIn("color=#F5A524", title)
+
+    def test_plugin_shows_reset_time(self):
+        self.fresh_cache(five_hour=self.open_window(10, 2 * 3600 + 15 * 60 + 30))
+        self.assertIn("Resets in 2h 15m (", self.plugin())
+
+    def test_plugin_shows_spend_limit(self):
+        spend = {**self.open_window(30, 86400 * 10),
+                 "used_usd": 1.5, "limit_usd": 10, "period": "monthly"}
+        self.fresh_cache(five_hour=self.open_window(10), spend_limit=spend)
+        out = self.plugin()
+        self.assertIn("Spend", out)
+        self.assertIn("$1.50 of $10.00 monthly", out)
+        # Spend isn't part of the title.
+        self.assertTrue(out.splitlines()[0].startswith("10% |"), out.splitlines()[0])
 
     def test_plugin_treats_passed_window_as_reset(self):
         self.cache.parent.mkdir(parents=True)

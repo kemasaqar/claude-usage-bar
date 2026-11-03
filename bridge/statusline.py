@@ -43,7 +43,7 @@ CONFIG_PATH = Path(
     )
 )
 WINDOWS = ("five_hour", "seven_day", "spend_limit")
-CHAIN_TIMEOUT_S = 5
+CHAIN_TIMEOUT_S = float(os.environ.get("CLAUDE_USAGE_BAR_CHAIN_TIMEOUT_S", "5"))
 
 
 def load_cache(path: Path) -> dict:

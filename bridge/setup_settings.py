@@ -29,6 +29,12 @@ def is_ours(status_line) -> bool:
     return isinstance(command, str) and command.endswith("/bridge/statusline.py")
 
 
+def describe(status_line) -> str:
+    if isinstance(status_line, dict):
+        return str(status_line.get("command", status_line))
+    return str(status_line)
+
+
 def load_settings(path: Path) -> dict:
     if not path.exists():
         return {}
@@ -67,7 +73,7 @@ def install(path: Path, bridge: str) -> None:
     current = settings.get("statusLine")
     if current and not is_ours(current):
         write_cache(CONFIG_PATH, {"original_status_line": current})
-        print(f"Kept your status line: {current.get('command', current)}")
+        print(f"Kept your status line: {describe(current)}")
         print("  It still shows in the terminal; the bridge runs it for you.")
     # Keep extra keys such as "padding" from the existing entry.
     wanted = {**(current if isinstance(current, dict) else {}),
@@ -87,14 +93,13 @@ def uninstall(path: Path, bridge: str) -> None:
     if not is_ours(current):
         print("statusLine doesn't point at this bridge; left it alone")
     else:
-        restore = isinstance(original, dict) and original
-        if restore:
+        if original:
             settings["statusLine"] = original
         else:
             del settings["statusLine"]
         save_settings(path, settings)
-        if restore:
-            print(f"Restored your status line: {original.get('command', original)}")
+        if original:
+            print(f"Restored your status line: {describe(original)}")
         else:
             print(f"Removed statusLine from {path}")
     CONFIG_PATH.unlink(missing_ok=True)

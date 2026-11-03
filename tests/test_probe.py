@@ -1,6 +1,7 @@
 """Run with: python3 -m unittest discover -s tests"""
 from __future__ import annotations
 
+import fcntl
 import json
 import os
 import stat
@@ -14,16 +15,23 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 PROBE = ROOT / "bridge" / "probe.py"
 
-# Mimics `claude -p --output-format stream-json`. FAKE_MODE=fail prints an error.
+# Mimics `claude -p --output-format stream-json`. FAKE_MODE: fail prints an
+# error, noevent succeeds without a rate_limit_event, slow hangs.
 FAKE_CLAUDE = """#!/usr/bin/env python3
-import json, os, sys
+import json, os, sys, time
 with open(os.environ["FAKE_LOG"], "a") as f:
     f.write(json.dumps(sys.argv[1:]) + "\\n")
-if os.environ.get("FAKE_MODE") == "fail":
+mode = os.environ.get("FAKE_MODE")
+if mode == "fail":
     print("Invalid API key", file=sys.stderr)
     sys.exit(1)
+if mode == "slow":
+    time.sleep(30)
 reset = int(os.environ["FAKE_RESET"])
 print(json.dumps({"type": "system", "subtype": "init"}))
+if mode == "noevent":
+    print(json.dumps({"type": "result", "subtype": "success"}))
+    sys.exit(0)
 print(json.dumps({"type": "rate_limit_event", "rate_limit_info": {
     "status": "allowed", "unifiedWindows": {
         "five_hour": {"utilization": 0.25, "resetsAt": reset},
@@ -103,6 +111,39 @@ class ProbeTest(unittest.TestCase):
         self.assertIn("Invalid API key", state["error"])
         w = json.loads(self.cache.read_text())["windows"]
         self.assertEqual(w["five_hour"]["used_percentage"], 10.0)
+
+    def probe_state(self) -> dict:
+        return json.loads((self.state_dir / "probe.json").read_text())
+
+    def test_reply_without_rate_limit_event_is_a_failure(self):
+        self.write_cache(self.now - 3600)
+        r = self.probe("--now", FAKE_MODE="noevent")
+        self.assertEqual(r.returncode, 1)
+        self.assertFalse(self.probe_state()["ok"])
+        w = json.loads(self.cache.read_text())["windows"]
+        self.assertEqual(w["five_hour"]["used_percentage"], 10.0)
+
+    def test_hung_claude_times_out(self):
+        start = time.time()
+        r = self.probe("--now", FAKE_MODE="slow", CLAUDE_USAGE_BAR_PROBE_TIMEOUT_S="1")
+        self.assertLess(time.time() - start, 10)
+        self.assertEqual(r.returncode, 1)
+        self.assertIn("timed out", self.probe_state()["error"])
+
+    def test_missing_claude_is_reported(self):
+        r = self.probe("--now", CLAUDE_USAGE_BAR_CLAUDE=str(self.state_dir / "nope"))
+        self.assertEqual(r.returncode, 1)
+        self.assertIn("claude not found", self.probe_state()["error"])
+        self.assertEqual(self.calls(), [])
+
+    def test_second_check_while_one_runs_is_skipped(self):
+        self.state_dir.mkdir(parents=True)
+        with open(self.state_dir / ".probe-lock", "w") as lock:
+            fcntl.flock(lock, fcntl.LOCK_EX)  # another check in progress
+            r = self.probe("--now")
+        self.assertEqual(r.returncode, 0)
+        self.assertIn("already running", r.stdout)
+        self.assertEqual(self.calls(), [])
 
     def test_auto_checks_while_window_open_even_when_idle(self):
         self.write_cache(self.now - 3600)       # 5-hour window resets in 1h
