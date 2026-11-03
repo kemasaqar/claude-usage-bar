@@ -99,3 +99,7 @@ All field parsing lives in `parse_window()` in `bridge/statusline.py`. If Claude
 ```bash
 python3 -m unittest discover -s tests -v
 ```
+
+## License
+
+MIT. See [LICENSE](LICENSE).
