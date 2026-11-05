@@ -45,6 +45,7 @@ It puts your original status line back (or removes ours), removes the login item
 
 - The `│` on each bar shows how much time has passed. If the bar fills past it, you're using your limit faster than time is passing.
 - If you'll hit 100% before the reset at your current pace, the reset line says when, for example `runs out ~15:40` in orange, and the number in the menu bar gets a `↗`.
+- While the 5-hour limit is heading over, auto-check reads your usage every minute instead of every 5, so the numbers keep up when it matters. The menu then shows `Auto-check: every 1m`. Back on track, it returns to every 5 minutes.
 - No warning appears in the first 30 minutes of the 5-hour window or the first 12 hours of the week. That's too early to guess.
 
 | Heading over: 48% used 2 hours into the 5-hour window | On track: 22% used 2 hours in |
