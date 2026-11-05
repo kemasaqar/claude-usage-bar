@@ -12,6 +12,7 @@ final class AutoCheckTests: TempTestCase {
         try writeFile(fake, """
         #!/bin/sh
         printf '%s\\n' "$*" >> '\(log.path)'
+        printf '%s\\n' "$PWD" > '\(root.appendingPathComponent("pwd.log").path)'
         case '\(mode)' in
           fail) echo "Invalid API key" >&2; exit 1 ;;
           slow) sleep 30 ;;
@@ -55,6 +56,15 @@ final class AutoCheckTests: TempTestCase {
             XCTAssertTrue(args.contains(flag), args)
         }
         XCTAssertEqual(state()["ok"] as? Bool, true)
+    }
+
+    func testClaudeRunsInTheProbeFolderWhateverPWDTheAppInherited() throws {
+        // The test process's own PWD stands in for a terminal's (it's
+        // usually this repo). claude must see the probe folder instead.
+        try fakeClaude()
+        XCTAssertEqual(AutoCheck.check(now: now, paths: paths), .ok)
+        let seen = try String(contentsOf: root.appendingPathComponent("pwd.log"), encoding: .utf8)
+        XCTAssertEqual(seen.trimmingCharacters(in: .newlines), paths.probeCwd.path)
     }
 
     func testFailureIsRecordedAndCacheUntouched() throws {

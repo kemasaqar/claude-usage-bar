@@ -126,6 +126,13 @@ public enum AutoCheck {
         try FileManager.default.createDirectory(at: paths.probeCwd, withIntermediateDirectories: true)
         var env = ProcessInfo.processInfo.environment
         env["PATH"] = searchPath(paths).joined(separator: ":")
+        // claude treats $PWD as the folder it's working in. An app opened
+        // from a terminal inherits that terminal's PWD, which may be a
+        // project on an external disk: claude then reads it, and macOS asks
+        // you to let ClaudeUsageBar access removable volumes. Point it at
+        // the empty probe folder instead.
+        env["PWD"] = paths.probeCwd.path
+        env.removeValue(forKey: "OLDPWD")
         let result = try runProgram(claude, [
             "-p",
             "--model", "haiku",
