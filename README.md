@@ -13,7 +13,11 @@ Resets in 3h 00m (16:30) · runs out ~15:40
 Resets in 3d 4h (Mon 09:00)
 ```
 
-**When will I run out?** The `│` on each bar marks where you'd be at an even pace, which is how much of the window has passed. A bar filled past it is using the limit faster than the window allows. When your average pace since the window started would reach 100% before the reset, the reset line says when (`runs out ~15:40`, in orange), and the menu bar number gets a `↗`. Nothing is stored for this: it comes from the current reading and the window's length. There's no estimate in the first 30 minutes of the 5-hour window or the first 12 hours of the week, when a short burst would project nonsense.
+**When will I run out?**
+
+- The `│` on each bar shows how much time has passed. If the bar fills past it, you're using your limit faster than time is passing.
+- If you'll hit 100% before the reset at your current pace, the reset line says when, for example `runs out ~15:40` in orange, and the number in the menu bar gets a `↗`.
+- No warning appears in the first 30 minutes of the 5-hour window or the first 12 hours of the week. That's too early to guess.
 
 | Heading over: 48% used 2 hours into the 5-hour window | On track: 22% used 2 hours in |
 |---|---|
