@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Removes Claude Usage Bar:
 #
-#   curl -fsSL https://raw.githubusercontent.com/kemasaqar/claude-usage-bar/swift/uninstall.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/kemasaqar/claude-usage-bar/main/uninstall.sh | bash
 #
 # Puts back the status line you had before (or removes ours), removes the
 # login item and deletes the app. Your readings stay in ~/.cache/claude-usage-bar.

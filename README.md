@@ -13,7 +13,7 @@ The circle works like a battery: full when you've used nothing, draining from th
 Needs macOS 13 or newer, a Claude Pro or Max plan, and [Claude Code](https://code.claude.com).
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/kemasaqar/claude-usage-bar/swift/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/kemasaqar/claude-usage-bar/main/install.sh | bash
 ```
 
 That:
@@ -34,7 +34,7 @@ That:
 ### Uninstall
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/kemasaqar/claude-usage-bar/swift/uninstall.sh | bash
+curl -fsSL https://raw.githubusercontent.com/kemasaqar/claude-usage-bar/main/uninstall.sh | bash
 ```
 
 It puts your original status line back (or removes ours), removes the login item and deletes the app. Your readings stay in `~/.cache/claude-usage-bar`.

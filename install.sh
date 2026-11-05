@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Installs Claude Usage Bar from the latest GitHub release:
 #
-#   curl -fsSL https://raw.githubusercontent.com/kemasaqar/claude-usage-bar/swift/install.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/kemasaqar/claude-usage-bar/main/install.sh | bash
 #
 # Downloads the app, puts it in /Applications (or ~/Applications), points
 # Claude Code's statusLine at it (keeping yours, if you have one), starts it
