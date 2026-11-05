@@ -1,0 +1,42 @@
+name: Build
+
+# Every push: test and build the app (the zip is kept as a workflow artifact).
+# A tag like v2.0.0: also publish dist/ClaudeUsageBar.zip to a GitHub Release,
+# which is what install.sh downloads.
+on:
+  push:
+    branches: [swift, main]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Test
+        run: swift test
+
+      - name: Build app
+        # The tag on a release; otherwise the last tag (build-app.sh's default).
+        run: scripts/build-app.sh "${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || '' }}"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ClaudeUsageBar
+          path: dist/ClaudeUsageBar.zip
+
+      - name: Publish release
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" dist/ClaudeUsageBar.zip \
+            --title "$GITHUB_REF_NAME" --generate-notes

@@ -1,29 +1,27 @@
 #!/usr/bin/env bash
-# Sets up claude-usage-bar: checks requirements, installs SwiftBar if needed,
-# points Claude Code's statusLine at the bridge (keeping yours, if you have
-# one) and links the plugin into SwiftBar. Safe to re-run.
+# Installs Claude Usage Bar from the latest GitHub release:
+#
+#   curl -fsSL https://raw.githubusercontent.com/kemasaqar/claude-usage-bar/swift/install.sh | bash
+#
+# Downloads the app, puts it in /Applications (or ~/Applications), points
+# Claude Code's statusLine at it (keeping yours, if you have one), starts it
+# at login, and opens it. Safe to re-run: that's also how you update.
+#
+# The app isn't notarized (no Apple Developer ID). Downloading with curl
+# means macOS doesn't mark it as from the internet, so there's no warning.
 set -euo pipefail
 
-ROOT="$(cd "$(dirname "$0")" && pwd)"
-BRIDGE="$ROOT/bridge/statusline.py"
-PLUGIN="$ROOT/swiftbar/claude-usage.5m.py"
-SETTINGS="$HOME/.claude/settings.json"
-SWIFTBAR_ID="com.ameba.SwiftBar"
-DEFAULT_PLUGIN_DIR="$HOME/Library/Application Support/SwiftBar/Plugins"
-# Folders to look for SwiftBar.app in, colon-separated (tests override this).
-APP_DIRS="${CLAUDE_USAGE_BAR_APP_DIRS:-/Applications:$HOME/Applications}"
+REPO="kemasaqar/claude-usage-bar"
+# A URL or a local path to ClaudeUsageBar.zip (tests and local builds).
+ZIP="${CLAUDE_USAGE_BAR_ZIP:-https://github.com/$REPO/releases/latest/download/ClaudeUsageBar.zip}"
+APP_NAME="ClaudeUsageBar.app"
 
 fail() { printf '\nError: %s\n' "$*" >&2; exit 1; }
 
 # 1. Requirements
-[[ "$(uname -s)" == Darwin ]] || fail "claude-usage-bar only runs on macOS."
-# Without Apple's Command Line Tools, /usr/bin/python3 is a stub that pops up
-# an install dialog, and the menu bar would stay blank.
-xcode-select -p >/dev/null 2>&1 \
-  || fail "Apple's Command Line Tools are missing. Run: xcode-select --install, then re-run ./install.sh"
-command -v python3 >/dev/null || fail "python3 not found."
-python3 -c 'import sys; sys.exit(sys.version_info < (3, 9))' \
-  || fail "Python 3.9 or newer is needed (found $(python3 -V 2>&1))."
+[[ "$(uname -s)" == Darwin ]] || fail "Claude Usage Bar only runs on macOS."
+major="$(sw_vers -productVersion | cut -d. -f1)"
+(( major >= 13 )) || fail "macOS 13 or newer is needed (you have $(sw_vers -productVersion))."
 
 CLAUDE=""
 for c in "$(command -v claude || true)" "$HOME/.local/bin/claude" "$HOME/.claude/local/claude" \
@@ -32,52 +30,51 @@ for c in "$(command -v claude || true)" "$HOME/.local/bin/claude" "$HOME/.claude
 done
 [[ -n "$CLAUDE" ]] || echo "Warning: Claude Code (claude) not found. Install it, or auto-check can't run."
 
-# 2. SwiftBar, the app that hosts the menu bar item
-find_swiftbar() {
-  local dir dirs
-  IFS=: read -ra dirs <<< "$APP_DIRS"
-  for dir in "${dirs[@]}"; do
-    [[ -d "$dir/SwiftBar.app" ]] && { echo "$dir/SwiftBar.app"; return; }
-  done
-  mdfind "kMDItemCFBundleIdentifier == '$SWIFTBAR_ID'" 2>/dev/null | head -1
-}
-SWIFTBAR_APP="$(find_swiftbar)"
-if [[ -z "$SWIFTBAR_APP" ]]; then
-  command -v brew >/dev/null \
-    || fail "SwiftBar isn't installed. Get it from https://swiftbar.app, then re-run ./install.sh"
-  if [[ -t 0 ]]; then
-    read -r -p "SwiftBar (shows the menu bar item) isn't installed. Install it with Homebrew? [Y/n] " answer
-    [[ "$answer" =~ ^[Nn] ]] && fail "SwiftBar is required."
-  fi
-  brew install --cask swiftbar
-  SWIFTBAR_APP="$(find_swiftbar)"
-  [[ -n "$SWIFTBAR_APP" ]] || fail "SwiftBar installed, but its app wasn't found."
-fi
-
-# SwiftBar asks for a plugin folder on first launch unless one is set and
-# exists, so set it up front.
-PLUGIN_DIR="$(defaults read "$SWIFTBAR_ID" PluginDirectory 2>/dev/null || true)"
-PLUGIN_DIR="${PLUGIN_DIR/#\~/$HOME}"
-if [[ -z "$PLUGIN_DIR" || ! -d "$PLUGIN_DIR" ]]; then
-  PLUGIN_DIR="$DEFAULT_PLUGIN_DIR"
-  mkdir -p "$PLUGIN_DIR"
-  pkill -x SwiftBar 2>/dev/null && sleep 1  # it would overwrite the setting on quit
-  defaults write "$SWIFTBAR_ID" PluginDirectory "$PLUGIN_DIR"
-  echo "Set SwiftBar's plugin folder to $PLUGIN_DIR"
-fi
-
-# 3. Claude Code statusLine -> bridge
-chmod +x "$BRIDGE" "$PLUGIN" "$ROOT/bridge/probe.py"
-python3 "$ROOT/bridge/setup_settings.py" install "$SETTINGS" "$BRIDGE"
-
-# 4. Plugin
-ln -sf "$PLUGIN" "$PLUGIN_DIR/claude-usage.5m.py"
-echo "Linked plugin into $PLUGIN_DIR"
-if pgrep -xq SwiftBar; then
-  open -g "swiftbar://refreshallplugins"
+# 2. Download and unpack
+tmp="$(mktemp -d)"
+trap 'rm -rf "$tmp"' EXIT
+if [[ "$ZIP" == http* ]]; then
+  echo "Downloading $ZIP"
+  curl -fsSL --retry 2 -o "$tmp/app.zip" "$ZIP" || fail "Download failed: $ZIP"
 else
-  open -a "$SWIFTBAR_APP"
+  cp "$ZIP" "$tmp/app.zip" || fail "Can't read $ZIP"
 fi
+ditto -x -k "$tmp/app.zip" "$tmp/unpacked" || fail "The download isn't a valid zip."
+[[ -x "$tmp/unpacked/$APP_NAME/Contents/MacOS/ClaudeUsageBar" ]] \
+  || fail "The download doesn't contain $APP_NAME."
+
+# 3. Install, replacing any older copy
+if [[ -n "${CLAUDE_USAGE_BAR_APP_DIR:-}" ]]; then
+  APP_DIR="$CLAUDE_USAGE_BAR_APP_DIR"
+  OLD_DIRS=("$APP_DIR")
+else
+  if [[ -w /Applications ]]; then APP_DIR="/Applications"; else APP_DIR="$HOME/Applications"; fi
+  OLD_DIRS=(/Applications "$HOME/Applications")
+fi
+mkdir -p "$APP_DIR"
+pkill -x ClaudeUsageBar 2>/dev/null && sleep 1 || true
+for dir in "${OLD_DIRS[@]}"; do
+  if [[ -e "$dir/$APP_NAME" ]]; then rm -rf "${dir:?}/$APP_NAME"; fi
+done
+mv "$tmp/unpacked/$APP_NAME" "$APP_DIR/$APP_NAME"
+APP="$APP_DIR/$APP_NAME"
+xattr -dr com.apple.quarantine "$APP" 2>/dev/null || true
+echo "Installed $APP"
+
+# 4. statusLine + start at login
+"$APP/Contents/MacOS/ClaudeUsageBar" setup
+
+# 5. Switching from the SwiftBar version? Remove its plugin so you don't get
+# two menu bar items. SwiftBar itself stays installed.
+PLUGIN_DIR="$(defaults read com.ameba.SwiftBar PluginDirectory 2>/dev/null || true)"
+PLUGIN_DIR="${PLUGIN_DIR/#\~/$HOME}"
+if [[ -n "$PLUGIN_DIR" && -L "$PLUGIN_DIR/claude-usage.5m.py" ]]; then
+  rm "$PLUGIN_DIR/claude-usage.5m.py"
+  open -g "swiftbar://refreshallplugins" 2>/dev/null || true
+  echo "Removed the old SwiftBar plugin (SwiftBar itself is still installed)"
+fi
+
+open "$APP"
 
 cat <<EOF
 
@@ -89,5 +86,5 @@ Done. The menu bar shows your 5-hour and weekly Claude limits (Pro/Max plans).
 - Can't see it? Menu bar managers hide new items: Bartender puts them in Always
   Hidden, Ice in its hidden section. Move it to Shown in their settings. On a
   MacBook with a notch it can also end up behind the notch.
-- To start SwiftBar at login, turn on Launch at Login in its preferences.
+- Update: run the same install command again.
 EOF
