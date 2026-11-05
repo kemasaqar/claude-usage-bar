@@ -41,14 +41,16 @@ func batteryIcon(remaining: Double, size: CGFloat = 16) -> NSImage {
 let menuWidth: CGFloat = 320
 let inset: CGFloat = 14
 
-/// One limit: label, progress bar with the even-pace marker, percentage,
-/// and the reset line (orange when the current pace runs out first).
-final class WindowRowView: NSView {
-    let row: WindowRow
+/// A menu row laid out at 100% and drawn scaled for the menu text size.
+/// Text and shapes are vectors, so they stay sharp at any size.
+class ScaledMenuView: NSView {
+    let scale: CGFloat
+    /// The row's bounds at 100%.
+    var base: NSRect { NSRect(x: 0, y: 0, width: bounds.width / scale, height: bounds.height / scale) }
 
-    init(row: WindowRow) {
-        self.row = row
-        super.init(frame: NSRect(x: 0, y: 0, width: menuWidth, height: row.spend == nil ? 42 : 58))
+    init(baseHeight: CGFloat, scale: CGFloat) {
+        self.scale = scale
+        super.init(frame: NSRect(x: 0, y: 0, width: menuWidth * scale, height: baseHeight * scale))
     }
 
     required init?(coder: NSCoder) { fatalError() }
@@ -56,6 +58,29 @@ final class WindowRowView: NSView {
     override var isFlipped: Bool { true }
 
     override func draw(_ dirtyRect: NSRect) {
+        let transform = NSAffineTransform()
+        transform.scale(by: scale)
+        transform.concat()
+        drawContent()
+    }
+
+    func drawContent() {}
+}
+
+/// One limit: label, progress bar with the even-pace marker, percentage,
+/// and the reset line (orange when the current pace runs out first).
+final class WindowRowView: ScaledMenuView {
+    let row: WindowRow
+
+    init(row: WindowRow, scale: CGFloat = 1) {
+        self.row = row
+        super.init(baseHeight: row.spend == nil ? 42 : 58, scale: scale)
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+
+    override func drawContent() {
+        let bounds = base
         let label = NSAttributedString(string: row.name.label, attributes: [
             .font: NSFont.systemFont(ofSize: 13), .foregroundColor: NSColor.labelColor,
         ])
@@ -104,10 +129,10 @@ final class WindowRowView: NSView {
 
 /// A line of text in the menu that isn't a command. Plain disabled menu
 /// items render grey and hard to read; a view keeps normal colors.
-final class InfoRowView: NSView {
+final class InfoRowView: ScaledMenuView {
     private let text: NSAttributedString
 
-    init(_ string: String, size: CGFloat = 11, color: NSColor = .secondaryLabelColor) {
+    init(_ string: String, size: CGFloat = 11, color: NSColor = .secondaryLabelColor, scale: CGFloat = 1) {
         let paragraph = NSMutableParagraphStyle()
         paragraph.lineBreakMode = .byWordWrapping
         text = NSAttributedString(string: string, attributes: [
@@ -116,15 +141,13 @@ final class InfoRowView: NSView {
         let height = text.boundingRect(
             with: NSSize(width: menuWidth - 2 * inset, height: 1000),
             options: [.usesLineFragmentOrigin]).height
-        super.init(frame: NSRect(x: 0, y: 0, width: menuWidth, height: ceil(height) + 6))
+        super.init(baseHeight: ceil(height) + 6, scale: scale)
     }
 
     required init?(coder: NSCoder) { fatalError() }
 
-    override var isFlipped: Bool { true }
-
-    override func draw(_ dirtyRect: NSRect) {
-        text.draw(with: NSRect(x: inset, y: 3, width: bounds.width - 2 * inset, height: bounds.height),
+    override func drawContent() {
+        text.draw(with: NSRect(x: inset, y: 3, width: base.width - 2 * inset, height: base.height),
                   options: [.usesLineFragmentOrigin])
     }
 }

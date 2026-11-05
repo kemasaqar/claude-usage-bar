@@ -8,7 +8,7 @@ import UsageCore
 //   ClaudeUsageBar probe --auto|--now|--pause|--resume
 //   ClaudeUsageBar setup                point statusLine here, start at login
 //   ClaudeUsageBar uninstall            undo setup
-//   ClaudeUsageBar render-preview OUT.png [heading-over|on-track|now]
+//   ClaudeUsageBar render-preview OUT.png [heading-over|on-track|now] [text size %]
 
 let paths = UsagePaths.fromEnvironment()
 let arguments = Array(CommandLine.arguments.dropFirst())
@@ -78,8 +78,10 @@ case "render-preview":
         fail("usage: ClaudeUsageBar render-preview OUT.png [heading-over|on-track|now]")
     }
     let scenario = arguments.count >= 3 ? arguments[2] : "now"
+    let percent = arguments.count >= 4 ? Int(arguments[3]) : nil
     do {
-        try Preview.render(scenario: scenario, to: URL(fileURLWithPath: arguments[1]), paths: paths)
+        try Preview.render(scenario: scenario, to: URL(fileURLWithPath: arguments[1]), paths: paths,
+                           scalePercent: TextScale.sanitize(percent))
     } catch {
         fail("\(error)")
     }

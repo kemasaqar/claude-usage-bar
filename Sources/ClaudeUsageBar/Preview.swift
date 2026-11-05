@@ -5,7 +5,8 @@ import UsageCore
 /// the app uses, in dark mode. For the README, and for checking the menu
 /// without clicking it. Scenarios use made-up numbers; "now" uses yours.
 enum Preview {
-    static func render(scenario: String, to url: URL, paths: UsagePaths) throws {
+    static func render(scenario: String, to url: URL, paths: UsagePaths,
+                       scalePercent: Int = TextScale.defaultPercent) throws {
         _ = NSApplication.shared
         let now = Date().timeIntervalSince1970 + 30  // so "3h 00m" doesn't read 2h 59m
         let model: MenuModel
@@ -21,7 +22,7 @@ enum Preview {
         default:
             throw CheckError("unknown scenario \(scenario); use heading-over, on-track or now")
         }
-        try png(of: canvas(model), to: url)
+        try png(of: canvas(model, scale: CGFloat(TextScale.factor(scalePercent))), to: url)
     }
 
     /// (used %, seconds since the window started) per window.
@@ -36,20 +37,22 @@ enum Preview {
                                paused: false, now: now, staleAfter: 3600)
     }
 
-    static func canvas(_ model: MenuModel) -> NSView {
+    /// The menu bar item stays at its fixed size; the menu below it scales.
+    static func canvas(_ model: MenuModel, scale: CGFloat = 1) -> NSView {
         var views: [NSView] = [MenuBarItemView(model: model)]
-        var menu: [NSView] = model.rows.map { WindowRowView(row: $0) }
-        menu.append(Separator())
-        if let last = model.lastReading { menu.append(InfoRowView(last)) }
-        menu.append(Separator())
-        menu.append(InfoRowView(model.autoCheck))
+        var menu: [NSView] = model.rows.map { WindowRowView(row: $0, scale: scale) }
+        menu.append(Separator(scale: scale))
+        if let last = model.lastReading { menu.append(InfoRowView(last, scale: scale)) }
+        menu.append(Separator(scale: scale))
+        menu.append(InfoRowView(model.autoCheck, scale: scale))
         for title in [model.paused ? "Resume auto-check" : "Pause auto-check", "Check now"] {
-            menu.append(InfoRowView(title, size: 13, color: .labelColor))
+            menu.append(InfoRowView(title, size: 13, color: .labelColor, scale: scale))
         }
         views.append(MenuPanel(views: menu))
 
         let height = views.reduce(0) { $0 + $1.frame.height } + 6
-        let root = Flipped(frame: NSRect(x: 0, y: 0, width: menuWidth, height: height))
+        let width = views.map(\.frame.width).max() ?? menuWidth
+        let root = Flipped(frame: NSRect(x: 0, y: 0, width: width, height: height))
         var y: CGFloat = 0
         for view in views {
             view.setFrameOrigin(NSPoint(x: 0, y: y))
@@ -114,7 +117,8 @@ private final class MenuBarItemView: Flipped {
 private final class MenuPanel: Flipped {
     init(views: [NSView]) {
         let height = views.reduce(0) { $0 + $1.frame.height } + 10
-        super.init(frame: NSRect(x: 0, y: 0, width: menuWidth, height: height))
+        let width = views.map(\.frame.width).max() ?? menuWidth
+        super.init(frame: NSRect(x: 0, y: 0, width: width, height: height))
         var y: CGFloat = 5
         for view in views {
             view.setFrameOrigin(NSPoint(x: 0, y: y))
@@ -132,7 +136,7 @@ private final class MenuPanel: Flipped {
 }
 
 private final class Separator: Flipped {
-    init() { super.init(frame: NSRect(x: 0, y: 0, width: menuWidth, height: 11)) }
+    init(scale: CGFloat = 1) { super.init(frame: NSRect(x: 0, y: 0, width: menuWidth * scale, height: 11)) }
     required init?(coder: NSCoder) { fatalError() }
 
     override func draw(_ dirtyRect: NSRect) {

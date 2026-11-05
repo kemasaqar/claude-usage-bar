@@ -52,6 +52,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         button.attributedTitle = titleString(model)
     }
 
+    /// Size of the open menu's content, saved in the app's preferences.
+    private var scalePercent: Int {
+        get { TextScale.sanitize(UserDefaults.standard.object(forKey: TextScale.defaultsKey) as? Int) }
+        set { UserDefaults.standard.set(TextScale.sanitize(newValue), forKey: TextScale.defaultsKey) }
+    }
+
     private func autoCheck(force: Bool = false) {
         guard !checking else { return }
         checking = true
@@ -76,27 +82,42 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         refresh()
         guard let model else { return }
         menu.removeAllItems()
+        let scale = CGFloat(TextScale.factor(scalePercent))
+        // Plain command items follow the menu's font.
+        menu.font = NSFont.menuFont(ofSize: NSFont.menuFont(ofSize: 0).pointSize * scale)
 
         if model.hasData {
-            for row in model.rows { menu.addItem(viewItem(WindowRowView(row: row))) }
+            for row in model.rows { menu.addItem(viewItem(WindowRowView(row: row, scale: scale))) }
             menu.addItem(.separator())
-            if let last = model.lastReading { menu.addItem(viewItem(InfoRowView(last))) }
-            if let note = model.staleNote { menu.addItem(viewItem(InfoRowView(note))) }
+            if let last = model.lastReading { menu.addItem(viewItem(InfoRowView(last, scale: scale))) }
+            if let note = model.staleNote { menu.addItem(viewItem(InfoRowView(note, scale: scale))) }
         } else {
-            menu.addItem(viewItem(InfoRowView("No usage data yet", size: 13, color: .labelColor)))
+            menu.addItem(viewItem(InfoRowView("No usage data yet", size: 13, color: .labelColor, scale: scale)))
             menu.addItem(viewItem(InfoRowView(
-                "Send a message in Claude Code, or use Check now. Limits appear only on Pro/Max plans.")))
+                "Send a message in Claude Code, or use Check now. Limits appear only on Pro/Max plans.",
+                scale: scale)))
         }
 
         menu.addItem(.separator())
-        menu.addItem(viewItem(InfoRowView(model.autoCheck)))
+        menu.addItem(viewItem(InfoRowView(model.autoCheck, scale: scale)))
         if let error = model.autoCheckError {
-            menu.addItem(viewItem(InfoRowView(error, color: Palette.critical)))
+            menu.addItem(viewItem(InfoRowView(error, color: Palette.critical, scale: scale)))
         }
         menu.addItem(item(model.paused ? "Resume auto-check" : "Pause auto-check", #selector(togglePause)))
         menu.addItem(item("Check now", #selector(checkNow), key: "r"))
 
         menu.addItem(.separator())
+        let sizes = NSMenu()
+        sizes.font = menu.font
+        for percent in TextScale.steps {
+            let size = item("\(percent)%", #selector(setTextSize(_:)))
+            size.tag = percent
+            size.state = percent == scalePercent ? .on : .off
+            sizes.addItem(size)
+        }
+        let textSize = NSMenuItem(title: "Text size", action: nil, keyEquivalent: "")
+        textSize.submenu = sizes
+        menu.addItem(textSize)
         let login = item("Open at login", #selector(toggleLogin))
         login.state = LoginItem.isEnabled(paths) ? .on : .off
         menu.addItem(login)
@@ -128,6 +149,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     @objc private func checkNow() { autoCheck(force: true) }
+
+    @objc private func setTextSize(_ sender: NSMenuItem) {
+        scalePercent = sender.tag
+        refresh()
+    }
 
     @objc private func toggleLogin() {
         if LoginItem.isEnabled(paths) {
