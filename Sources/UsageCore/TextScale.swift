@@ -1,9 +1,9 @@
 import Foundation
 
-/// Size of the open menu's content, in 5% steps. The item in the menu bar
+/// Size of the open menu's content, in 10% steps. The item in the menu bar
 /// itself always keeps the system size.
 public enum TextScale {
-    public static let steps = Array(stride(from: 80, through: 150, by: 5))
+    public static let steps = Array(stride(from: 80, through: 150, by: 10))
     public static let defaultPercent = 100
     public static let defaultsKey = "menuTextScalePercent"
 

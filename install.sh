@@ -52,7 +52,14 @@ else
   OLD_DIRS=(/Applications "$HOME/Applications")
 fi
 mkdir -p "$APP_DIR"
-pkill -x ClaudeUsageBar 2>/dev/null && sleep 1 || true
+# Quit the running copy and wait until it's gone: a new copy that starts
+# while the old one is still exiting thinks it's a duplicate and quits.
+if pkill -x ClaudeUsageBar 2>/dev/null; then
+  for _ in 1 2 3 4 5 6 7 8 9 10; do
+    pgrep -x ClaudeUsageBar >/dev/null || break
+    sleep 0.5
+  done
+fi
 for dir in "${OLD_DIRS[@]}"; do
   if [[ -e "$dir/$APP_NAME" ]]; then rm -rf "${dir:?}/$APP_NAME"; fi
 done

@@ -29,7 +29,7 @@ That:
 
 **Before installing,** know that auto-check uses your account: while your 5-hour window is open or you're using Claude Code, it sends a tiny Haiku request (about 900 tokens) at most every 5 minutes. **Pause auto-check** in the menu turns it off.
 
-**Menu text too small** (say, on a wide monitor)? Open the menu and pick **Text size**: 80% to 150% in 5% steps. It scales everything in the open menu; the item in the menu bar keeps its normal size. The setting is remembered.
+**Menu text too small** (say, on a wide monitor)? Open the menu and pick **Text size**: 80% to 150% in 10% steps. It scales everything in the open menu; the item in the menu bar keeps its normal size. The setting is remembered.
 
 **Don't see it in the menu bar?** Menu bar managers hide new items. Bartender puts them in **Always Hidden**, and Ice in its hidden section: move it to Shown in their settings. On a MacBook with a notch, the item can also end up behind the notch.
 
