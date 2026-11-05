@@ -3,15 +3,23 @@
 Shows your Claude plan limits (5-hour session and 7-day weekly) in the macOS menu bar, refreshed every 5 minutes.
 
 ```
-◒ 23% · 41%          ← menu bar (circle shows what's left of the higher of the two, like a
+◒ 48%↗ · 41%         ← menu bar (circle shows what's left of the higher of the two, like a
                         battery: full at 0% used, drains from the top; orange at 70%,
-                        red at 90%, ⚠ when stale)
+                        red at 90%, ⚠ when stale; ↗ and orange when running out early)
 ─────────────────
-5-hour ████░░░░░░░░░░░░░░░░  23.5%
-Resets in 2h 14m (16:30)
-7-day  ████████░░░░░░░░░░░░  41.2%
+5-hour ████████│█░░░░░░░░░░  48.0%
+Resets in 3h 00m (16:30) · runs out ~15:40
+7-day  ████████░░░│░░░░░░░░  41.2%
 Resets in 3d 4h (Mon 09:00)
 ```
+
+**When will I run out?** The `│` on each bar marks where you'd be at an even pace, which is how much of the window has passed. A bar filled past it is using the limit faster than the window allows. When your average pace since the window started would reach 100% before the reset, the reset line says when (`runs out ~15:40`, in orange), and the menu bar number gets a `↗`. Nothing is stored for this: it comes from the current reading and the window's length. There's no estimate in the first 30 minutes of the 5-hour window or the first 12 hours of the week, when a short burst would project nonsense.
+
+| Heading over: 48% used 2 hours into the 5-hour window | On track: 22% used 2 hours in |
+|---|---|
+| ![Menu when the 5-hour limit runs out before the reset](docs/menu-heading-over.svg) | ![Menu when both limits last until the reset](docs/menu-on-track.svg) |
+
+These are drawn from the plugin's real output for those numbers (`scripts/render_previews.py`), in dark mode.
 
 ![The menu bar icon at 0%, 10%, ... 100% usage, left to right](docs/icon-levels.png)
 
@@ -92,7 +100,7 @@ The plugin is a symlink into this folder, so keep the folder where it is; `git p
 
 To refresh more or less often, rename the plugin link (e.g. `claude-usage.1m.py`).
 
-The circle icon is drawn as a PNG by the plugin itself (no image files). Its size, outline width and the gap before the fill are `ICON_PT`, `RING_PT` and `GAP_PT` at the top of `swiftbar/claude-usage.5m.py`. After changing them, run `python3 scripts/render_icon_preview.py` to redraw the preview images above.
+The circle icon is drawn as a PNG by the plugin itself (no image files). Its size, outline width and the gap before the fill are `ICON_PT`, `RING_PT` and `GAP_PT` at the top of `swiftbar/claude-usage.5m.py`. After changing them, run `python3 scripts/render_previews.py` to redraw the preview images above.
 
 ## When it breaks
 

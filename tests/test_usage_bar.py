@@ -149,7 +149,8 @@ class UsageBarTest(unittest.TestCase):
     def test_plugin_shows_percentages_and_colors(self):
         self.bridge(payload(five=(92, self.now + 3600), seven=(41, self.now + 86400 * 3)))
         title = self.plugin().splitlines()[0]
-        self.assertTrue(title.startswith("92% · 41% |"), title)
+        # 92% four hours into the 5-hour window also runs out before the reset.
+        self.assertTrue(title.startswith("92%↗ · 41% |"), title)
         self.assertIn("color=#E5484D", title)
 
     def test_plugin_icon_shows_what_is_left(self):
@@ -235,6 +236,50 @@ class UsageBarTest(unittest.TestCase):
         self.assertIn("$1.50 of $10.00 monthly", out)
         # Spend isn't part of the title.
         self.assertTrue(out.splitlines()[0].startswith("10% |"), out.splitlines()[0])
+
+    def five_hour_at(self, used, elapsed_s):
+        return {"used_percentage": used, "resets_at": self.now + 5 * 3600 - elapsed_s}
+
+    def assert_runs_out(self, out, when, fmt="%H:%M"):
+        """The plugin runs a moment after self.now, which can push the
+        projection past a minute boundary."""
+        options = {time.strftime(fmt, time.localtime(when + d)) for d in (0, 60)}
+        self.assertTrue(any(f"runs out ~{o}" in out for o in options), (options, out))
+
+    def test_heading_over_shows_run_out_time(self):
+        # 48% after 2h: 100% at 4h10m, 50 minutes before the reset.
+        self.fresh_cache(five_hour=self.five_hour_at(48, 2 * 3600))
+        out = self.plugin()
+        title = out.splitlines()[0]
+        self.assertTrue(title.startswith("48%↗ |"), title)
+        self.assertIn("color=#F5A524", title)  # orange though under 70%
+        self.assert_runs_out(out, self.now + 2 * 3600 + 600)
+        self.assertIn("| size=11 color=#F5A524", out)
+
+    def test_on_track_shows_no_run_out_time(self):
+        self.fresh_cache(five_hour=self.five_hour_at(22, 2 * 3600))  # ends near 55%
+        out = self.plugin()
+        self.assertNotIn("↗", out)
+        self.assertNotIn("runs out", out)
+        self.assertNotIn("color=", out.splitlines()[0])
+
+    def test_no_run_out_time_early_in_window(self):
+        self.fresh_cache(five_hour=self.five_hour_at(10, 10 * 60))  # would project 300%
+        self.assertNotIn("runs out", self.plugin())
+
+    def test_weekly_run_out_shows_the_day(self):
+        week = {"used_percentage": 50, "resets_at": self.now + 4 * 86400}  # 3 days in
+        self.fresh_cache(five_hour=self.five_hour_at(10, 2 * 3600), seven_day=week)
+        out = self.plugin()
+        self.assertTrue(out.splitlines()[0].startswith("10% · 50%↗ |"), out.splitlines()[0])
+        self.assert_runs_out(out, self.now + 3 * 86400, "%a %H:%M")
+
+    def test_bar_marks_even_pace(self):
+        self.fresh_cache(five_hour=self.five_hour_at(0, 2 * 3600))  # 40% of the window gone
+        line = next(l for l in self.plugin().splitlines() if l.startswith("5-hour"))
+        bar = line.split()[1]
+        self.assertEqual(len(bar), 20)
+        self.assertEqual(bar.index("│"), 8)
 
     def test_plugin_treats_passed_window_as_reset(self):
         self.cache.parent.mkdir(parents=True)

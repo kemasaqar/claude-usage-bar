@@ -37,6 +37,10 @@ PROBE_STATE = CACHE_PATH.parent / "probe.json"
 STALE_AFTER_S = int(os.environ.get("CLAUDE_USAGE_BAR_STALE_MIN", "60")) * 60
 
 LABELS = {"five_hour": "5-hour", "seven_day": "7-day", "spend_limit": "Spend"}
+WINDOW_S = {"five_hour": 5 * 3600, "seven_day": 7 * 86400}
+# No run-out estimate before this much of a window has passed: a few minutes
+# of use would otherwise project something silly.
+MIN_ELAPSED_S = {"five_hour": 30 * 60, "seven_day": 12 * 3600}
 FONT = "font=Menlo size=12"
 # Lines without an action render as disabled (grey) menu items; an explicit
 # color keeps them readable. SwiftBar takes "light,dark".
@@ -49,17 +53,47 @@ RING_PT = 1.5    # outline width
 GAP_PT = 1.5     # space between the outline and the fill
 
 
+WARN_COLOR = "#F5A524"
+
+
 def color_for(pct: float) -> str:
     if pct >= 90:
         return "#E5484D"
     if pct >= 70:
-        return "#F5A524"
+        return WARN_COLOR
     return ""  # default menu bar color
 
 
-def bar(pct: float, width: int = 20) -> str:
+def bar(pct: float, width: int = 20, mark: float | None = None) -> str:
+    """mark (0..1) draws │ where an even pace would put you now."""
     filled = round(max(0.0, min(100.0, pct)) / 100 * width)
-    return "█" * filled + "░" * (width - filled)
+    chars = ["█"] * filled + ["░"] * (width - filled)
+    if mark is not None:
+        chars[min(width - 1, round(max(0.0, min(1.0, mark)) * width))] = "│"
+    return "".join(chars)
+
+
+def elapsed_fraction(name: str, window: dict, now: float) -> float | None:
+    length = WINDOW_S.get(name)
+    if not length:
+        return None
+    start = window["resets_at"] - length
+    return max(0.0, min(1.0, (now - start) / length))
+
+
+def runs_out_at(name: str, window: dict, now: float) -> float | None:
+    """When usage hits 100% if it keeps its average pace since the window
+    started. None if it lasts until the reset, or it's too early to tell."""
+    length = WINDOW_S.get(name)
+    used = window["used_percentage"]
+    if not length or not 0 < used < 100:
+        return None
+    start = window["resets_at"] - length
+    elapsed = now - start
+    if elapsed < MIN_ELAPSED_S[name]:
+        return None
+    out = start + elapsed * 100 / used
+    return out if out < window["resets_at"] else None
 
 
 def icon_alpha(pct: float) -> list[bytearray]:
@@ -217,36 +251,46 @@ def main() -> None:
         if not isinstance(w, dict) or "resets_at" not in w:
             continue
         pct, has_reset = effective_pct(w, now)
-        rows.append((name, w, pct, has_reset))
+        out = None if has_reset else runs_out_at(name, w, now)
+        rows.append((name, w, pct, has_reset, out))
 
     # Title: 5h and 7d percentages, colored by the worse of the two.
+    # ↗ marks a window that runs out before its reset at the current pace.
     title_parts = []
     worst = 0.0
-    for name, _w, pct, has_reset in rows:
+    heading_over = False
+    for name, _w, pct, has_reset, out in rows:
         if name == "spend_limit":
             continue
-        title_parts.append(f"{pct:.0f}%" + ("↺" if has_reset else ""))
+        title_parts.append(f"{pct:.0f}%" + ("↺" if has_reset else "") + ("↗" if out else ""))
         worst = max(worst, pct)
+        heading_over = heading_over or out is not None
     title = " · ".join(title_parts) or "–"
     if stale:
         title += " ⚠"
     attrs = [f"templateImage={png_base64(icon_alpha(100 - worst))}"]
-    color = color_for(worst)
+    color = color_for(worst) or (WARN_COLOR if heading_over else "")
     if color:
         attrs.append(f"color={color}")
     print(f"{title} | {' '.join(attrs)}")
 
     print("---")
-    for name, w, pct, has_reset in rows:
+    for name, w, pct, has_reset, out in rows:
         label = LABELS[name]
         c = color_for(pct) or TEXT_COLOR
-        print(f"{label:<7}{bar(pct)} {pct:5.1f}% | {FONT} color={c}")
+        mark = None if has_reset else elapsed_fraction(name, w, now)
+        print(f"{label:<7}{bar(pct, mark=mark)} {pct:5.1f}% | {FONT} color={c}")
         info = f"size=11 color={TEXT_COLOR}"
         if has_reset:
             print(f"Window has reset (0% until the next reading) | {info}")
         else:
             left = fmt_duration(w["resets_at"] - now)
-            print(f"Resets in {left} ({fmt_clock(w['resets_at'], now)}) | {info}")
+            line = f"Resets in {left} ({fmt_clock(w['resets_at'], now)})"
+            if out:
+                # SwiftBar colors whole lines, so the whole line turns orange.
+                print(f"{line} · runs out ~{fmt_clock(out, now)} | size=11 color={WARN_COLOR}")
+            else:
+                print(f"{line} | {info}")
         if name == "spend_limit" and "used_usd" in w and "limit_usd" in w:
             print(f"${w['used_usd']:.2f} of ${w['limit_usd']:.2f} {w.get('period', '')} | {info}")
 
