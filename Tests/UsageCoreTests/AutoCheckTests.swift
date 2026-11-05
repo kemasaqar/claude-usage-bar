@@ -141,6 +141,31 @@ final class AutoCheckTests: TempTestCase {
         XCTAssertEqual(calls(), [])
     }
 
+    func testEveryMinuteWhileFiveHourIsHeadingOver() throws {
+        // 2 hours into the window: 48% runs out before the reset, 22% doesn't.
+        let reset = now + 3 * 3600
+        try writeCache([.fiveHour: Window(usedPercentage: 48, resetsAt: reset)], checkedAt: now - 61)
+        XCTAssertEqual(AutoCheck.shouldCheck(now: now, paths: paths).1, "5-hour window open")
+        try writeCache([.fiveHour: Window(usedPercentage: 48, resetsAt: reset)], checkedAt: now - 59)
+        XCTAssertEqual(AutoCheck.shouldCheck(now: now, paths: paths).1, "recent reading")
+    }
+
+    func testBackToFiveMinutesWhenOnTrack() throws {
+        let reset = now + 3 * 3600
+        try writeCache([.fiveHour: Window(usedPercentage: 22, resetsAt: reset)], checkedAt: now - 61)
+        XCTAssertEqual(AutoCheck.shouldCheck(now: now, paths: paths).1, "recent reading")
+        try writeCache([.fiveHour: Window(usedPercentage: 22, resetsAt: reset)], checkedAt: now - 300)
+        XCTAssertEqual(AutoCheck.shouldCheck(now: now, paths: paths).1, "5-hour window open")
+    }
+
+    func testWeeklyPaceDoesNotSpeedUpChecks() throws {
+        // Weekly heading over (60% a day in), 5-hour on track.
+        try writeCache([.fiveHour: Window(usedPercentage: 10, resetsAt: now + 3 * 3600),
+                        .sevenDay: Window(usedPercentage: 60, resetsAt: now + 6 * 86400)],
+                       checkedAt: now - 61)
+        XCTAssertEqual(AutoCheck.shouldCheck(now: now, paths: paths).1, "recent reading")
+    }
+
     func testChecksAfterActivityThenNotTwice() throws {
         try fakeClaude()
         try cacheAt(checked: now - 3600, fiveHourReset: now - 60)

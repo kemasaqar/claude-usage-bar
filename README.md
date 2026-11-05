@@ -27,7 +27,7 @@ That:
 
 **No security warning:** the app isn't notarized (that needs a paid Apple Developer account), but files downloaded with `curl` aren't marked as coming from the internet, so macOS opens it without asking. If you download `ClaudeUsageBar.zip` from the [Releases page](https://github.com/kemasaqar/claude-usage-bar/releases) in a browser instead, macOS will block it the first time: go to **System Settings → Privacy & Security** and click **Open Anyway**.
 
-**Before installing,** know that auto-check uses your account: while your 5-hour window is open or you're using Claude Code, it sends a tiny Haiku request (about 900 tokens) at most every 5 minutes. **Pause auto-check** in the menu turns it off.
+**Before installing,** know that auto-check uses your account: while your 5-hour window is open or you're using Claude Code, it sends a tiny Haiku request (about 900 tokens) every 5 minutes, or every minute while you're on course to run out of your 5-hour limit. **Pause auto-check** in the menu turns it off.
 
 **Menu text too small** (say, on a wide monitor)? Open the menu and pick **Text size**: 80% to 150% in 10% steps. It scales everything in the open menu; the item in the menu bar keeps its normal size. The setting is remembered.
 
@@ -69,18 +69,20 @@ Claude Code ──stdin JSON──▶ ClaudeUsageBar statusline ──▶ ~/.cac
 
 ### Auto-check (desktop app and editor panels)
 
-Only terminal sessions run the status line, so the app fills the gap. Every minute it decides whether to check. A check runs when auto-check isn't paused (menu: **Pause / Resume auto-check**), the last reading is at least 5 minutes old, and either:
+Only terminal sessions run the status line, so the app fills the gap. Every 15 seconds it decides whether to check. A check runs when auto-check isn't paused (menu: **Pause / Resume auto-check**), the last reading is old enough, and either:
 
 - your 5-hour window is still open, which also catches usage from claude.ai and other devices, or
 - a Claude Code transcript under `~/.claude/projects` changed since the last reading (some session, in any app, was active).
 
+"Old enough" is 5 minutes normally, and 1 minute while the 5-hour limit is heading over (the orange `runs out ~HH:MM`), so you see it coming. It goes back to 5 minutes once the pace is back on track. The menu says `Auto-check: every 1m` when it's checking faster. Only the 5-hour limit does this: the weekly one moves too slowly for faster checks to show anything new.
+
 When you're idle and the 5-hour window has closed, checks stop: any request would itself open a new 5-hour window and shift your reset times. The menu then shows "idle, waiting for activity", and checks resume as soon as you use Claude Code again.
 
-A check runs `claude -p --model haiku` with no tools, no MCP servers, no user settings or hooks, a one-line system prompt, and `--no-session-persistence`, then reads the `rate_limit_event` from its stream-json output. Measured cost: about 900 tokens per check, at most 12 an hour. **Check now** runs one immediately, even while paused.
+A check runs `claude -p --model haiku` with no tools, no MCP servers, no user settings or hooks, a one-line system prompt, and `--no-session-persistence`, then reads the `rate_limit_event` from its stream-json output. Measured cost: about 900 tokens per check: up to 12 an hour normally (about 11,000 tokens), up to 60 an hour while heading over (about 54,000). **Check now** runs one immediately, even while paused.
 
 ### Limits of this approach
 
-- Only the **terminal CLI** runs the status line. Tested 2026-10-30: the Claude desktop app's Code tab and the VS Code/Cursor extension's graphical panel never call it. Auto-check covers those, with up to 5 minutes' delay.
+- Only the **terminal CLI** runs the status line. Tested 2026-10-30: the Claude desktop app's Code tab and the VS Code/Cursor extension's graphical panel never call it. Auto-check covers those, with up to 5 minutes' delay (1 minute while heading over).
 - With auto-check paused, numbers update only when a terminal session gets a reply. Usage from claude.ai or the desktop app shares the same limits but shows up only after your next Claude Code reply.
 - `rate_limits` is present only on Pro/Max plans (or a gateway with a spend limit).
 - Using your own OAuth login against the usage endpoint was ruled out: Anthropic's [legal and compliance page](https://code.claude.com/docs/en/legal-and-compliance) restricts subscription OAuth to Anthropic's own apps.
@@ -94,7 +96,7 @@ These apply to the status line and to `ClaudeUsageBar` run from a terminal. The 
 | `CLAUDE_USAGE_BAR_CACHE` | `~/.cache/claude-usage-bar/usage.json` | the readings |
 | `CLAUDE_USAGE_BAR_CONFIG` | `~/.config/claude-usage-bar/config.json` | your original status line, saved at install |
 | `CLAUDE_USAGE_BAR_STALE_MIN` | `60` | minutes without a reading before ⚠ |
-| `CLAUDE_USAGE_BAR_PROBE_MIN` | `5` | minimum minutes between auto-checks |
+| `CLAUDE_USAGE_BAR_PROBE_MIN` | `5` | minutes between auto-checks (1 while the 5-hour limit is heading over) |
 | `CLAUDE_USAGE_BAR_CLAUDE` | found automatically | path to the `claude` binary (when set, only this one is tried) |
 | `CLAUDE_USAGE_BAR_PROBE_TIMEOUT_S` | `90` | seconds before a check gives up |
 | `CLAUDE_USAGE_BAR_CHAIN_TIMEOUT_S` | `5` | seconds to wait for your original status line before showing ours |

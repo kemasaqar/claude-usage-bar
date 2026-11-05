@@ -9,6 +9,8 @@ import Foundation
 /// roughly a thousand Haiku tokens and saves no session.
 public enum AutoCheck {
     public static let idleReason = "idle, no open 5-hour window"
+    /// How often to check while the 5-hour limit is heading over.
+    public static let headingOverInterval: TimeInterval = 60
 
     public enum Outcome: Equatable {
         case ok
@@ -25,12 +27,25 @@ public enum AutoCheck {
         if FileManager.default.fileExists(atPath: paths.pauseFlag.path) { return (false, "paused") }
         let cache = UsageCache.load(paths.cache)
         let lastReading = max(cache.checkedAt ?? 0, loadState(paths).double("last_run") ?? 0)
-        if now - lastReading < paths.probeInterval { return (false, "recent reading") }
+        if now - lastReading < interval(cache, now: now, paths: paths) { return (false, "recent reading") }
         if lastActivity(paths.projects) > lastReading { return (true, "activity since last reading") }
         if let fiveHour = cache.windows[.fiveHour], fiveHour.resetsAt > now {
             return (true, "5-hour window open")
         }
         return (false, idleReason)
+    }
+
+    /// Every minute while the 5-hour limit would run out before it resets at
+    /// your current pace (the orange "runs out" in the menu), so you see it
+    /// coming. Otherwise the normal interval (5 minutes). The weekly limit
+    /// moves too slowly for faster checks to tell you anything new.
+    public static func interval(_ cache: UsageCache, now: Double, paths: UsagePaths) -> TimeInterval {
+        headingOver(cache, now: now) ? min(paths.probeInterval, headingOverInterval) : paths.probeInterval
+    }
+
+    public static func headingOver(_ cache: UsageCache, now: Double) -> Bool {
+        guard let fiveHour = cache.windows[.fiveHour] else { return false }
+        return runsOutAt(.fiveHour, fiveHour, now: now) != nil
     }
 
     /// Runs a check if `shouldCheck` says so; records why not otherwise.

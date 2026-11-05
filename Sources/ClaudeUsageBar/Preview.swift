@@ -33,7 +33,7 @@ enum Preview {
         let cache = UsageCache(
             windows: [.fiveHour: window(.fiveHour, fiveHour), .sevenDay: window(.sevenDay, sevenDay)],
             updatedAt: now, checkedAt: now)
-        return MenuModel.build(cache: cache, probeState: ["last_run": now - 120, "ok": true],
+        return MenuModel.build(cache: cache, probeState: ["last_run": now - 60, "ok": true],
                                paused: false, now: now, staleAfter: 3600)
     }
 

@@ -31,10 +31,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         refresh()
         // Re-read the files often: the status line writes them on every
         // reply, and reading is cheap. Auto-check decides for itself
-        // whether a request is due (at most every 5 minutes).
+        // whether a request is due: every 5 minutes, or every minute while
+        // the 5-hour limit is heading over. Asking every 15s keeps that
+        // 1 minute close to 1 minute.
         timers = [
-            Timer.scheduledTimer(withTimeInterval: 15, repeats: true) { [weak self] _ in self?.refresh() },
-            Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in self?.autoCheck() },
+            Timer.scheduledTimer(withTimeInterval: 15, repeats: true) { [weak self] _ in
+                self?.refresh()
+                self?.autoCheck()
+            },
         ]
         autoCheck()
     }

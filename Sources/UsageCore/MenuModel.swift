@@ -44,7 +44,8 @@ public struct MenuModel: Equatable {
         cache: UsageCache, probeState: [String: Any], paused: Bool, now: Double,
         staleAfter: TimeInterval, timeZone: TimeZone = .current
     ) -> MenuModel {
-        let auto = autoCheckLine(probeState: probeState, paused: paused, now: now)
+        let auto = autoCheckLine(probeState: probeState, paused: paused,
+                                 headingOver: AutoCheck.headingOver(cache, now: now), now: now)
         guard !cache.windows.isEmpty else {
             return MenuModel(title: "–", titleLevel: .normal, remaining: 100, rows: [],
                              lastReading: nil, staleNote: nil, autoCheck: auto.line,
@@ -103,16 +104,16 @@ public struct MenuModel: Equatable {
             autoCheck: auto.line, autoCheckError: auto.error, paused: paused)
     }
 
-    static func autoCheckLine(probeState: [String: Any], paused: Bool, now: Double)
-        -> (line: String, error: String?) {
-        var status = paused ? "paused" : "on"
-        if !paused, (probeState["skipped"] as? String)?.hasPrefix("idle") == true {
+    static func autoCheckLine(probeState: [String: Any], paused: Bool, headingOver: Bool = false,
+                              now: Double) -> (line: String, error: String?) {
+        var status = paused ? "paused" : headingOver ? "every 1m" : "on"
+        if !paused, !headingOver, (probeState["skipped"] as? String)?.hasPrefix("idle") == true {
             status += " · idle, waiting for activity"
         }
         var error: String?
         if let lastRun = probeState.double("last_run"), lastRun > 0 {
             let ok = probeState["ok"] as? Bool == true
-            status += " · last check \(Format.duration(now - lastRun)) ago \(ok ? "✓" : "✗")"
+            status += " · checked \(Format.duration(now - lastRun)) ago \(ok ? "✓" : "✗")"
             if !ok { error = probeState["error"] as? String }
         }
         return ("Auto-check: \(status)", error)

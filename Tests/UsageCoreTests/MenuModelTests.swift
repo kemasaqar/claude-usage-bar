@@ -121,14 +121,23 @@ final class MenuModelTests: TempTestCase {
     func testAutoCheckIdleAndLastGoodCheck() {
         let m = model([.fiveHour: open(10)],
                       probeState: ["last_run": now - 120, "ok": true, "skipped": AutoCheck.idleReason])
-        XCTAssertEqual(m.autoCheck, "Auto-check: on · idle, waiting for activity · last check 2m ago ✓")
+        XCTAssertEqual(m.autoCheck, "Auto-check: on · idle, waiting for activity · checked 2m ago ✓")
         XCTAssertNil(m.autoCheckError)
+    }
+
+    func testAutoCheckSaysWhenItChecksEveryMinute() {
+        // 48% used 2 hours in: runs out before the reset.
+        let over = model([.fiveHour: fiveHour(48, elapsed: 2 * 3600)],
+                         probeState: ["last_run": now - 60, "ok": true])
+        XCTAssertEqual(over.autoCheck, "Auto-check: every 1m · checked 1m ago ✓")
+        let paused = model([.fiveHour: fiveHour(48, elapsed: 2 * 3600)], paused: true)
+        XCTAssertEqual(paused.autoCheck, "Auto-check: paused")
     }
 
     func testAutoCheckFailureShowsError() {
         let m = model([.fiveHour: open(10)],
                       probeState: ["last_run": now - 60, "ok": false, "error": "Invalid API key"])
-        XCTAssertTrue(m.autoCheck.hasSuffix("last check 1m ago ✗"), m.autoCheck)
+        XCTAssertTrue(m.autoCheck.hasSuffix("checked 1m ago ✗"), m.autoCheck)
         XCTAssertEqual(m.autoCheckError, "Invalid API key")
     }
 }
