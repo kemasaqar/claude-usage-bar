@@ -43,7 +43,9 @@ It puts your original status line back (or removes ours), removes the login item
 
 ## When will I run out?
 
-- The `│` on each bar shows how much time has passed. If the bar fills past it, you're using your limit faster than time is passing.
+- The `│` on each bar shows where an even pace would put you. If the bar fills past it, you're using your limit faster than that.
+  - **5-hour:** it moves continuously with the time that has passed.
+  - **Weekly:** the bar is split into 7 equal days, weekends included, each ending at the same time of day as your weekly reset. The `│` sits at the end of today, so it's today's allowance: under it, you still have room today; past it, you're using tomorrow's share. It moves one day at a time.
 - If you'll hit 100% before the reset at your current pace, the reset line says when, for example `runs out ~15:40` in orange, and the number in the menu bar gets a `↗`.
 - While the 5-hour limit is heading over, auto-check reads your usage every minute instead of every 5, so the numbers keep up when it matters. The menu then shows `Auto-check: every 1m`. Back on track, it returns to every 5 minutes.
 - No warning appears in the first 30 minutes of the 5-hour window or the first 12 hours of the week. That's too early to guess.

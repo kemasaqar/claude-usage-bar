@@ -18,6 +18,11 @@ final class MenuModelTests: TempTestCase {
         Window(usedPercentage: pct, resetsAt: now + 5 * 3600 - elapsed)
     }
 
+    /// A 7-day window `elapsed` seconds in.
+    func sevenDay(_ pct: Double, elapsed: Double) -> Window {
+        Window(usedPercentage: pct, resetsAt: now + 7 * 86400 - elapsed)
+    }
+
     func row(_ m: MenuModel, _ name: WindowName) -> WindowRow { m.rows.first { $0.name == name }! }
 
     func testNoDataShowsSetupHelp() {
@@ -108,6 +113,24 @@ final class MenuModelTests: TempTestCase {
     func testPaceMarkIsTimePassed() {
         let m = model([.fiveHour: fiveHour(0, elapsed: 2 * 3600)])
         XCTAssertEqual(row(m, .fiveHour).paceMark!, 0.4, accuracy: 0.001)
+    }
+
+    func testWeeklyMarkIsTheEndOfTheCurrentDay() {
+        // Days run from the reset: 2d 17h in is day 3, so the mark is at 3/7.
+        let m = model([.sevenDay: sevenDay(41, elapsed: 2 * 86400 + 17 * 3600)])
+        XCTAssertEqual(row(m, .sevenDay).paceMark!, 3.0 / 7, accuracy: 0.0001)
+        XCTAssertEqual(row(m, .sevenDay).dayTicks.count, 6)
+        XCTAssertEqual(row(m, .sevenDay).dayTicks[2], 3.0 / 7, accuracy: 0.0001)
+        // First minute of the week: day 1. Last day: the end of the bar.
+        XCTAssertEqual(row(model([.sevenDay: sevenDay(1, elapsed: 60)]), .sevenDay).paceMark!, 1.0 / 7, accuracy: 0.0001)
+        XCTAssertEqual(row(model([.sevenDay: sevenDay(1, elapsed: 6 * 86400 + 60)]), .sevenDay).paceMark!, 1, accuracy: 0.0001)
+        // Exactly at a day boundary the next day has started.
+        XCTAssertEqual(row(model([.sevenDay: sevenDay(1, elapsed: 86400)]), .sevenDay).paceMark!, 2.0 / 7, accuracy: 0.0001)
+    }
+
+    func testFiveHourHasNoDayTicks() {
+        let m = model([.fiveHour: fiveHour(10, elapsed: 3600)])
+        XCTAssertEqual(row(m, .fiveHour).dayTicks, [])
     }
 
     // MARK: Auto-check line

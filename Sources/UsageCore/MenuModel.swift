@@ -14,9 +14,12 @@ public struct WindowRow: Equatable {
     public var percent: Double
     public var level: Level
     public var hasReset: Bool
-    /// 0...1: how much of the window has passed, where an even pace would
-    /// put you now. Drawn as a marker on the bar.
+    /// 0...1: where an even pace would put you, drawn as a marker on the
+    /// bar. 5-hour: how much of the window has passed. Weekly: the end of
+    /// the current day, counting days from the reset (today's allowance).
     public var paceMark: Double?
+    /// 0...1: day boundaries on the weekly bar (six, for seven equal days).
+    public var dayTicks: [Double] = []
     /// "Resets in 2h 14m (16:30)" or "Window has reset (...)".
     public var detail: String
     /// "15:40" when the current pace runs out before the reset.
@@ -71,7 +74,8 @@ public struct MenuModel: Equatable {
             }
             rows.append(WindowRow(
                 name: name, percent: pct, level: .forPercent(pct), hasReset: hasReset,
-                paceMark: hasReset ? nil : elapsedFraction(name, window, now: now),
+                paceMark: hasReset ? nil : paceMark(name, window, now: now),
+                dayTicks: name == .sevenDay && !hasReset ? (1...6).map { Double($0) / 7 } : [],
                 detail: detail,
                 runsOut: out.map { Format.clock($0, now: now, timeZone: timeZone) },
                 spend: spend))
@@ -125,6 +129,16 @@ public func elapsedFraction(_ name: WindowName, _ window: Window, now: Double) -
     guard let length = name.length else { return nil }
     let start = window.resetsAt - length
     return min(1, max(0, (now - start) / length))
+}
+
+/// Where the marker goes. The 5-hour one moves continuously; the weekly one
+/// steps once a day, to the end of the current day. Days run from the
+/// reset time, so the week is seven equal days: on day 3 it's at 3/7.
+public func paceMark(_ name: WindowName, _ window: Window, now: Double) -> Double? {
+    guard let fraction = elapsedFraction(name, window, now: now) else { return nil }
+    guard name == .sevenDay else { return fraction }
+    let days = 7.0
+    return min(days, (fraction * days).rounded(.down) + 1) / days
 }
 
 /// When usage hits 100% if it keeps its average pace since the window

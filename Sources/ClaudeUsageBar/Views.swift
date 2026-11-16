@@ -97,14 +97,30 @@ final class WindowRowView: ScaledMenuView {
         // Bar between the label column and the percentage.
         let barX: CGFloat = inset + 54
         let bar = NSRect(x: barX, y: 10, width: bounds.width - inset - 60 - barX, height: 7)
+        NSGraphicsContext.saveGraphicsState()
+        if !row.dayTicks.isEmpty {
+            // Day boundaries: leave small gaps in the bar, so the menu's
+            // own background shows through whatever color it is.
+            let gap: CGFloat = 1.5
+            let edges = [bar.minX] + row.dayTicks.map { (bar.minX + bar.width * CGFloat($0)).rounded() } + [bar.maxX]
+            let segments = NSBezierPath()
+            for (start, end) in zip(edges, edges.dropFirst()) {
+                let left = start == bar.minX ? start : start + gap / 2
+                let right = end == bar.maxX ? end : end - gap / 2
+                segments.appendRect(NSRect(x: left, y: bar.minY - 1, width: right - left, height: bar.height + 2))
+            }
+            segments.addClip()
+        }
         NSColor.quaternaryLabelColor.setFill()
         NSBezierPath(roundedRect: bar, xRadius: 3.5, yRadius: 3.5).fill()
         let fill = NSRect(x: bar.minX, y: bar.minY,
                           width: bar.width * CGFloat(min(100, max(0, row.percent)) / 100), height: bar.height)
         (Palette.color(row.level) ?? NSColor.labelColor.withAlphaComponent(0.8)).setFill()
         NSBezierPath(roundedRect: fill, xRadius: 3.5, yRadius: 3.5).fill()
+        NSGraphicsContext.restoreGraphicsState()
         if let mark = row.paceMark {
-            // Where an even pace would put you now.
+            // Where an even pace would put you: now (5-hour), or by the
+            // end of today (weekly).
             let x = (bar.minX + bar.width * CGFloat(mark)).rounded() + 0.5
             NSColor.labelColor.setFill()
             NSRect(x: x - 0.75, y: bar.minY - 3, width: 1.5, height: bar.height + 6).fill()
