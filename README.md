@@ -31,6 +31,14 @@ That:
 
 **Menu text too small** (say, on a wide monitor)? Open the menu and pick **Text size**: 80% to 150% in 10% steps. It scales everything in the open menu; the item in the menu bar keeps its normal size. The setting is remembered.
 
+**Want a heads-up?** Open the menu and pick **Notifications**: every 10%, 20%, 25% or 50%. For the 5-hour and the weekly limit you then get a notification:
+
+- each time usage passes another step (with *Every 20%*: at 20%, 40%, 60%, 80% and 100%),
+- when the limit is on course to run out before it resets (the orange `runs out ~15:40`),
+- when a limit that reached 90% has reset.
+
+Each is sent once per window, and turning it on tells you where you are now. It's off until you pick a step. macOS asks for permission the first time: click **Allow** on its prompt. A click anywhere else on the prompt counts as a no; the menu then shows **Allow in System Settings…**, which opens the page with the switch.
+
 **Don't see it in the menu bar?** Menu bar managers hide new items. Bartender puts them in **Always Hidden**, and Ice in its hidden section: move it to Shown in their settings. On a MacBook with a notch, the item can also end up behind the notch.
 
 ### Uninstall
@@ -120,6 +128,8 @@ swift test                       # all tests
 swift build && .build/debug/ClaudeUsageBar   # run the app from source
 scripts/build-app.sh 2.0.0       # dist/ClaudeUsageBar.app + .zip, universal, ad-hoc signed
 ```
+
+Run from source, the menu has no **Notifications**: macOS only lets an app bundle send them. Build the app with `scripts/build-app.sh` to try them, and quit your installed copy first (a second copy quits itself).
 
 Nothing in the tests touches your real setup. They use temporary cache, config and settings files and a fake `claude`. `Tests/ScriptTests` runs the real `install.sh` and `uninstall.sh` with a temporary `HOME`, a fake app, and fake `curl`, `open`, `defaults` and other system commands first on `PATH`.
 

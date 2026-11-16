@@ -1,5 +1,6 @@
 import AppKit
 import UsageCore
+import UserNotifications
 
 final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private let paths: UsagePaths
@@ -7,6 +8,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var model: MenuModel?
     private var timers: [Timer] = []
     private var checking = false
+    /// The notification API needs the app bundle: in a bare `swift build`
+    /// binary it aborts, so notifications aren't offered there.
+    private let canNotify = Bundle.main.bundleIdentifier != nil
+    /// What macOS said when asked to allow notifications; nil until it answers.
+    private var notifyGranted: Bool?
 
     init(paths: UsagePaths) {
         self.paths = paths
@@ -38,9 +44,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             Timer.scheduledTimer(withTimeInterval: 15, repeats: true) { [weak self] _ in
                 self?.refresh()
                 self?.autoCheck()
+                self?.askAgainIfBlocked()
             },
         ]
         autoCheck()
+        if notifyStep > 0 { askToNotify() }
     }
 
     // MARK: Data
@@ -51,6 +59,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             cache: UsageCache.load(paths.cache), probeState: AutoCheck.loadState(paths),
             paused: AutoCheck.isPaused(paths), now: now, staleAfter: paths.staleAfter)
         self.model = model
+        sendAlerts(model)
         guard let button = statusItem?.button else { return }
         button.image = batteryIcon(remaining: model.remaining)
         button.attributedTitle = titleString(model)
@@ -78,6 +87,50 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 self?.refresh()
             }
         }
+    }
+
+    // MARK: Notifications
+
+    /// A notification every this many percent: picked in the menu, saved in
+    /// the app's preferences. 0 is off.
+    private var notifyStep: Int {
+        get { canNotify ? UserDefaults.standard.integer(forKey: Alerts.stepKey) : 0 }
+        set { UserDefaults.standard.set(newValue, forKey: Alerts.stepKey) }
+    }
+
+    /// macOS shows its prompt only the first time; after that it answers
+    /// straight away. So this also runs at every launch: if an update lost
+    /// the permission, you're asked again instead of hearing nothing.
+    private func askToNotify() {
+        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { [weak self] granted, _ in
+            DispatchQueue.main.async {
+                self?.notifyGranted = granted
+                self?.refresh()
+            }
+        }
+    }
+
+    /// After a no, keep asking: macOS answers without a prompt, so allowing
+    /// notifications in System Settings is noticed within seconds.
+    private func askAgainIfBlocked() {
+        if notifyStep > 0, notifyGranted == false { askToNotify() }
+    }
+
+    private func sendAlerts(_ model: MenuModel) {
+        // Without a reading there's nothing to say, and nothing sent to forget.
+        guard notifyStep > 0, notifyGranted == true, model.hasData else { return }
+        let defaults = UserDefaults.standard
+        let before = defaults.stringArray(forKey: Alerts.sentKey) ?? []
+        var sent = before
+        for alert in Alerts.due(model.rows, every: notifyStep, sent: &sent) {
+            let content = UNMutableNotificationContent()
+            content.title = alert.title
+            content.body = alert.body
+            content.sound = .default
+            UNUserNotificationCenter.current().add(
+                UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: nil))
+        }
+        if sent != before { defaults.set(sent, forKey: Alerts.sentKey) }
     }
 
     // MARK: Menu
@@ -122,6 +175,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let textSize = NSMenuItem(title: "Text size", action: nil, keyEquivalent: "")
         textSize.submenu = sizes
         menu.addItem(textSize)
+        if canNotify {
+            let steps = NSMenu()
+            steps.font = menu.font
+            for percent in [0] + Alerts.steps {
+                let step = item(percent == 0 ? "Off" : "Every \(percent)%", #selector(setNotifyStep(_:)))
+                step.tag = percent
+                step.state = percent == notifyStep ? .on : .off
+                steps.addItem(step)
+            }
+            let notify = NSMenuItem(title: "Notifications", action: nil, keyEquivalent: "")
+            notify.submenu = steps
+            menu.addItem(notify)
+            // macOS said no: its prompt takes any click but Allow as one.
+            if notifyStep > 0, notifyGranted == false {
+                menu.addItem(item("Allow in System Settings…", #selector(openNotificationSettings)))
+            }
+        }
         let login = item("Open at login", #selector(toggleLogin))
         login.state = LoginItem.isEnabled(paths) ? .on : .off
         menu.addItem(login)
@@ -157,6 +227,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     @objc private func setTextSize(_ sender: NSMenuItem) {
         scalePercent = sender.tag
         refresh()
+    }
+
+    @objc private func setNotifyStep(_ sender: NSMenuItem) {
+        notifyStep = sender.tag
+        if notifyStep > 0 { askToNotify() }
+    }
+
+    /// This app's page in System Settings → Notifications.
+    @objc private func openNotificationSettings() {
+        let id = Bundle.main.bundleIdentifier ?? ""
+        if let url = URL(string: "x-apple.systempreferences:com.apple.Notifications-Settings.extension?id=\(id)") {
+            NSWorkspace.shared.open(url)
+        }
     }
 
     @objc private func toggleLogin() {
