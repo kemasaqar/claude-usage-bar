@@ -14,6 +14,8 @@ public struct WindowRow: Equatable {
     public var percent: Double
     public var level: Level
     public var hasReset: Bool
+    /// When the window resets. Also tells one window from the next.
+    public var resetsAt: Double
     /// 0...1: where an even pace would put you, drawn as a marker on the
     /// bar. 5-hour: how much of the window has passed. Weekly: the end of
     /// the current day, counting days from the reset (today's allowance).
@@ -74,6 +76,7 @@ public struct MenuModel: Equatable {
             }
             rows.append(WindowRow(
                 name: name, percent: pct, level: .forPercent(pct), hasReset: hasReset,
+                resetsAt: window.resetsAt,
                 paceMark: hasReset ? nil : paceMark(name, window, now: now),
                 dayTicks: name == .sevenDay && !hasReset ? (1...6).map { Double($0) / 7 } : [],
                 detail: detail,
