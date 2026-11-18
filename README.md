@@ -135,7 +135,16 @@ Run from source, the menu has no **Notifications**: macOS only lets an app bundl
 
 Nothing in the tests touches your real setup. They use temporary cache, config and settings files and a fake `claude`. `Tests/ScriptTests` runs the real `install.sh` and `uninstall.sh` with a temporary `HOME`, a fake app, and fake `curl`, `open`, `defaults` and other system commands first on `PATH`.
 
-**Releases:** pushing a tag like `v2.0.0` makes GitHub Actions test, build and publish `ClaudeUsageBar.zip` to a GitHub Release, which is what `install.sh` downloads. Every push also builds the zip as a workflow artifact.
+**Releases:** merging a pull request into `main` makes GitHub Actions test, build and publish `ClaudeUsageBar.zip` to a GitHub Release, which is what `install.sh` downloads, so a merge reaches everyone who installs or updates. The version comes from the pull request's labels:
+
+| Label | 2.4.0 becomes |
+|---|---|
+| none | 2.4.1 |
+| `minor` | 2.5.0 |
+| `major` | 3.0.0 |
+| `no release` | no release |
+
+A pull request that only changes docs (`*.md`, `docs/`, `LICENSE`) isn't released. Pushing a tag like `v2.0.0` yourself also releases; a plain push to `main` doesn't. Every push builds the zip as a workflow artifact.
 
 To redraw the menu pictures above: `.build/debug/ClaudeUsageBar render-preview docs/menu-heading-over.png heading-over` (and `on-track`).
 
