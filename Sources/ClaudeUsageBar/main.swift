@@ -9,6 +9,7 @@ import UsageCore
 //   ClaudeUsageBar setup                point statusLine here, start at login
 //   ClaudeUsageBar uninstall            undo setup
 //   ClaudeUsageBar render-preview OUT.png [heading-over|on-track|now] [text size %]
+//   ClaudeUsageBar render-icon OUT.icon      the app icon, for the build
 
 let paths = UsagePaths.fromEnvironment()
 let arguments = Array(CommandLine.arguments.dropFirst())
@@ -72,6 +73,11 @@ case "uninstall":
     } catch {
         fail("\(error)")
     }
+
+case "render-icon":
+    // Used by scripts/build-app.sh: an Icon Composer file for actool.
+    guard arguments.count >= 2 else { fail("usage: ClaudeUsageBar render-icon OUT.icon") }
+    do { try Icons.writeIconFile(to: URL(fileURLWithPath: arguments[1])) } catch { fail("\(error)") }
 
 case "render-preview":
     guard arguments.count >= 2 else {

@@ -18,24 +18,36 @@ enum Palette {
 /// like a battery. Full when nothing is used, empty at 100%. A template
 /// image, so macOS tints it to match the menu bar.
 func batteryIcon(remaining: Double, size: CGFloat = 16) -> NSImage {
-    let ring: CGFloat = 1.5, gap: CGFloat = 1.5, margin: CGFloat = 0.5
     let image = NSImage(size: NSSize(width: size, height: size), flipped: false) { rect in
-        NSColor.black.set()
-        let outer = rect.insetBy(dx: margin + ring / 2, dy: margin + ring / 2)
-        let ringPath = NSBezierPath(ovalIn: outer)
-        ringPath.lineWidth = ring
-        ringPath.stroke()
-
-        let disc = rect.insetBy(dx: margin + ring + gap, dy: margin + ring + gap)
-        let level = disc.height * CGFloat(max(0, min(100, remaining)) / 100)
-        NSGraphicsContext.saveGraphicsState()
-        NSBezierPath(rect: NSRect(x: disc.minX, y: disc.minY, width: disc.width, height: level)).addClip()
-        NSBezierPath(ovalIn: disc).fill()
-        NSGraphicsContext.restoreGraphicsState()
+        drawBattery(in: rect, remaining: remaining, color: .black)
         return true
     }
     image.isTemplate = true
     return image
+}
+
+/// The battery glyph in `rect` (not flipped), at any size: the 16pt icon's
+/// ring 1.5, gap 1.5 and margin 0.5, scaled. `empty` tints the used part.
+func drawBattery(in rect: NSRect, remaining: Double, color: NSColor, empty: NSColor? = nil) {
+    let k = rect.width / 16
+    let ring = 1.5 * k, gap = 1.5 * k, margin = 0.5 * k
+    color.set()
+    let outer = rect.insetBy(dx: margin + ring / 2, dy: margin + ring / 2)
+    let ringPath = NSBezierPath(ovalIn: outer)
+    ringPath.lineWidth = ring
+    ringPath.stroke()
+
+    let disc = rect.insetBy(dx: margin + ring + gap, dy: margin + ring + gap)
+    if let empty {
+        empty.setFill()
+        NSBezierPath(ovalIn: disc).fill()
+        color.setFill()
+    }
+    let level = disc.height * CGFloat(max(0, min(100, remaining)) / 100)
+    NSGraphicsContext.saveGraphicsState()
+    NSBezierPath(rect: NSRect(x: disc.minX, y: disc.minY, width: disc.width, height: level)).addClip()
+    NSBezierPath(ovalIn: disc).fill()
+    NSGraphicsContext.restoreGraphicsState()
 }
 
 let menuWidth: CGFloat = 320

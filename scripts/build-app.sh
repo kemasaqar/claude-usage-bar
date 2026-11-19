@@ -16,6 +16,16 @@ BIN_DIR="$(swift build -c release --arch arm64 --arch x86_64 --show-bin-path)"
 rm -rf dist
 mkdir -p "$APP/Contents/MacOS"
 cp "$BIN_DIR/ClaudeUsageBar" "$APP/Contents/MacOS/ClaudeUsageBar"
+# The app icon: an Icon Composer file the app draws from the menu bar
+# glyph, compiled into Assets.car (macOS 26) and AppIcon.icns (older).
+mkdir -p "$APP/Contents/Resources"
+# actool quietly does nothing with relative paths.
+"$BIN_DIR/ClaudeUsageBar" render-icon "$ROOT/dist/AppIcon.icon"
+xcrun actool "$ROOT/dist/AppIcon.icon" --compile "$ROOT/$APP/Contents/Resources" --platform macosx \
+  --minimum-deployment-target 13.0 --app-icon AppIcon \
+  --output-partial-info-plist "$ROOT/dist/AppIcon-Info.plist" >/dev/null
+test -f "$APP/Contents/Resources/Assets.car" || { echo "actool didn't make the app icon" >&2; exit 1; }
+rm -rf dist/AppIcon.icon dist/AppIcon-Info.plist
 cat > "$APP/Contents/Info.plist" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -26,6 +36,8 @@ cat > "$APP/Contents/Info.plist" <<EOF
   <key>CFBundleDisplayName</key><string>Claude Usage Bar</string>
   <key>CFBundleExecutable</key><string>ClaudeUsageBar</string>
   <key>CFBundlePackageType</key><string>APPL</string>
+  <key>CFBundleIconFile</key><string>AppIcon</string>
+  <key>CFBundleIconName</key><string>AppIcon</string>
   <key>CFBundleShortVersionString</key><string>$VERSION</string>
   <key>CFBundleVersion</key><string>$VERSION</string>
   <key>LSMinimumSystemVersion</key><string>13.0</string>
