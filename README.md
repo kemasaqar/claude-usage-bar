@@ -37,9 +37,11 @@ That:
 - when the limit is on course to run out before it resets (the orange `runs out ~15:40`),
 - when a limit that reached 90% has reset.
 
-<img src="docs/notifications.png" width="360" alt="Three notifications: 5-hour limit at 48% with when it runs out, 7-day limit runs out ~Fri 10:17, and 5-hour limit has reset">
+<img src="docs/notifications.png" width="360" alt="Three notifications with the app's amber icon: 5-hour limit at 48% with when it runs out, 7-day limit runs out ~Fri 10:17, and 5-hour limit has reset">
 
 Each is sent once per window, and turning it on tells you where you are now. It's off until you pick a step. macOS asks for permission the first time: click **Allow** on its prompt. A click anywhere else on the prompt counts as a no; the menu then shows **Allow in System Settings…**, which opens the page with the switch.
+
+The app's amber icon shows on notifications from 2.5.0. If you allowed notifications on 2.4.0, macOS keeps the generic icon it saved for the app back then; the notifications themselves work the same.
 
 **Don't see it in the menu bar?** Menu bar managers hide new items. Bartender puts them in **Always Hidden**, and Ice in its hidden section: move it to Shown in their settings. On a MacBook with a notch, the item can also end up behind the notch.
 
@@ -123,7 +125,7 @@ All field parsing lives in `Window.init(json:)` in `Sources/UsageCore/Usage.swif
 
 ## Development
 
-Needs Xcode (for a universal build) or the Command Line Tools.
+Needs Xcode (for a universal build) or the Command Line Tools. `scripts/build-app.sh` needs Xcode 26: the app icon is an Icon Composer file the app draws (`render-icon`), compiled with `actool`.
 
 ```bash
 swift test                       # all tests
